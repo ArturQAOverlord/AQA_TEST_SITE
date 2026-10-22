@@ -43,9 +43,9 @@ class TestSource:
     modules: list[ast.Module]  # файл с тестом и conftest.py из той же папки
 
 
-def find_source(directory: Path, func_name: str) -> TestSource | None:
+def find_source(directory: Path, func_name: str, test_file: Path | None = None) -> TestSource | None:
     conftests = [ast.parse(p.read_text(encoding="utf-8")) for p in directory.glob("conftest.py")]
-    for path in sorted(directory.rglob("test_*.py")):
+    for path in [test_file] if test_file else sorted(directory.rglob("test_*.py")):
         try:
             module = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError:
@@ -142,16 +142,24 @@ def free_port() -> int:
 
 
 def collect(test_dir: str) -> dict[str, str]:
-    """Имя тестовой функции -> 'путь::функция' (параметризованные случаи запускаются все вместе)."""
+    """Имя тестовой функции -> 'путь::функция' (параметризованные случаи запускаются все вместе).
+
+    Если функция объявлена в нескольких файлах (например, в своём и в exercises/web/
+    из редактора на сайте), берётся файл, который менялся последним.
+    """
     result = subprocess.run(
         [sys.executable, "-m", "pytest", test_dir, "--collect-only", "-q", "-p", "no:cacheprovider"],
         cwd=BASE_DIR, capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
-    tests = {}
+    tests: dict[str, str] = {}
     for line in result.stdout.splitlines():
         match = re.match(r"^(\S+\.py)::(test_\w+)", line.strip())
-        if match:
-            tests.setdefault(match.group(2), f"{match.group(1)}::{match.group(2)}")
+        if not match:
+            continue
+        path, func = match.groups()
+        current = tests.get(func)
+        if current is None or (BASE_DIR / path).stat().st_mtime > (BASE_DIR / current.split("::")[0]).stat().st_mtime:
+            tests[func] = f"{path}::{func}"
     return tests
 
 
@@ -233,7 +241,8 @@ def main() -> int:
     test_dir = (BASE_DIR / args.dir).resolve()
     tests = collect(args.dir)
     targets = [MISSIONS_BY_SLUG[s] for s in args.slugs] if args.slugs else [m for m in MISSIONS if m.verifiable]
-    jobs = [(m, tests[m.func_name], find_source(test_dir, m.func_name)) for m in targets if m.func_name in tests]
+    jobs = [(m, tests[m.func_name], find_source(test_dir, m.func_name, BASE_DIR / tests[m.func_name].split("::")[0]))
+            for m in targets if m.func_name in tests]
     missing = [m for m in targets if m.func_name not in tests]
 
     if not jobs:

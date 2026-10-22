@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ mission.title }} — AQA Lab{% endblock %}
+{% block head %}
+{# Без интернета CDN не загрузится — тогда редактор работает как обычное текстовое поле #}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+{% endblock %}
 {% block content %}
 <div class="crumbs">
   <a href="{{ url_for('index') }}#catalog">Миссии</a> / <a href="{{ url_for('index') }}#cat-{{ category.id }}">{{ category.title }}</a>
@@ -14,7 +20,7 @@
       {% if mission.kind == "bug" %}<span class="kind-badge">🔍 найди баг</span>{% endif %}
       {% if mission.kind == "robust" %}<span class="kind-badge">🛠 почини тест</span>{% endif %}
       {% if mission.static_check %}<span class="kind-badge">📐 проверка структуры</span>{% endif %}
-      {% if solved_at %}<span class="done-mark">✓ решено {{ solved_at | replace('T', ' ') }}</span>{% endif %}
+      <span class="done-mark {{ '' if solved_at else 'hidden' }}" id="solved-badge">✓ решено{% if solved_at %} {{ solved_at | replace('T', ' ') }}{% endif %}</span>
     </div>
     <h1>{{ mission.title }}</h1>
 
@@ -33,11 +39,30 @@
     </div>
     {% endif %}
 
-    <h3>Стартовый шаблон</h3>
-    <div class="code-wrap">
-      <button class="copy" type="button">Копировать</button>
-      <pre><code>{{ starter }}</code></pre>
-    </div>
+    <section class="editor-box" id="editor-box" data-slug="{{ mission.slug }}" data-kind="{{ mission.kind }}">
+      <div class="editor-head">
+        <h3>Твой тест</h3>
+        <span class="muted editor-file" title="Этот же файл можно открыть в IDE">
+          <code>{{ editor_path }}</code> · <span id="save-state">{{ "сохранён" if editor_saved else "ещё не сохранён" }}</span>
+        </span>
+      </div>
+      <textarea id="code" spellcheck="false" aria-label="Код теста">{{ editor_code }}</textarea>
+      <div class="editor-toolbar">
+        <button class="btn-primary" type="button" id="run">▶ Запустить</button>
+        {% if not headless_only %}
+        <label class="inline muted"><input type="checkbox" id="headed"> показывать браузер</label>
+        {% endif %}
+        <span class="spacer"></span>
+        <button class="btn-ghost" type="button" id="save">Сохранить</button>
+        <button class="btn-ghost" type="button" id="reset">Сбросить к шаблону</button>
+      </div>
+      <p class="muted editor-keys">Ctrl+Enter — запустить · Ctrl+S — сохранить · Ctrl+Space — подсказки · Ctrl+/ — комментарий</p>
+      <div class="run-result hidden" id="run-result">
+        <div class="run-summary" id="run-summary"></div>
+        <pre id="run-output"></pre>
+      </div>
+      <script type="application/json" id="starter">{{ starter | tojson }}</script>
+    </section>
 
     {% if mission.verifiable %}
     <div class="mutants" id="verify-box" data-slug="{{ mission.slug }}">
@@ -144,6 +169,12 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="{{ url_for('static', filename='editor.js') }}"></script>
 <script>
   document.querySelectorAll('.copy').forEach(btn => btn.addEventListener('click', async () => {
     const text = btn.parentElement.querySelector('code').innerText;

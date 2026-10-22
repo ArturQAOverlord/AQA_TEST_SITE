@@ -11,3 +11,4 @@ allure-results/
 allure-report/
 # Эталоны скриншотов зависят от ОС и шрифтов — у каждого свои
 __snapshots__/
+.venv/

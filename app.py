@@ -36,6 +36,16 @@ PROGRESS_FILE = DATA_DIR / "progress.json"
 VERIFIED_FILE = DATA_DIR / "verified.json"
 SOLUTIONS_DIR = BASE_DIR / "tests"
 EXERCISES_DIR = BASE_DIR / "exercises"
+# Сюда сохраняет код редактор на странице миссии: exercises/web/test_<миссия>.py
+WEB_SOLUTIONS_DIR = EXERCISES_DIR / "web"
+RUN_TIMEOUT = 180
+MAX_CODE_SIZE = 100_000
+# Запуск кода из редактора — это выполнение произвольного Python на сервере.
+# По умолчанию разрешён только с этой же машины; в Docker порт публикуется
+# только на localhost хоста, и проверка адреса отключается (LAB_ALLOW_REMOTE_RUN=1).
+ALLOW_REMOTE_RUN = os.environ.get("LAB_ALLOW_REMOTE_RUN") == "1"
+# Без дисплея (Docker) браузер можно запускать только headless
+HEADLESS_ONLY = os.environ.get("LAB_HEADLESS_ONLY") == "1"
 
 STARTER_TEMPLATE = '''import re
 
@@ -157,6 +167,10 @@ def forecast_issued_at(fid: str) -> int | None:
     return int(issued)
 
 
+def solution_path(mission) -> Path:
+    return WEB_SOLUTIONS_DIR / f"{mission.func_name}.py"
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.json.ensure_ascii = False
@@ -167,6 +181,7 @@ def create_app() -> Flask:
     todos: list[dict] = []
     parts: dict[tuple[str, bool], set[str]] = {}
     verify_jobs: dict[str, dict] = {}
+    run_locks: dict[str, threading.Lock] = {}
 
     chat_rooms: dict[str, list[dict]] = {}
     chat_cond = threading.Condition()
@@ -181,6 +196,12 @@ def create_app() -> Flask:
 
     def is_reference():
         return bool(request.headers.get("X-Lab-Reference"))
+
+    def runner_forbidden():
+        """Ответ 403, если код с этого адреса запускать нельзя (см. ALLOW_REMOTE_RUN)."""
+        if ALLOW_REMOTE_RUN or request.remote_addr in ("127.0.0.1", "::1"):
+            return None
+        return jsonify(error="Запуск тестов разрешён только с компьютера, где работает сайт"), 403
 
     def get_mission(slug):
         mission = MISSIONS_BY_SLUG.get(slug)
@@ -229,13 +250,19 @@ def create_app() -> Flask:
              if t.slugs.index(slug) + 1 < len(t.slugs) else None)
             for t in TRACKS if slug in t.slugs
         ]
+        starter = template.format(func=mission.func_name, slug=slug, check=STATUS_CHECK)
+        saved = solution_path(mission)
         return render_template(
             "mission.html",
             mission=mission,
             category=next(c for c in CATEGORIES if c.id == mission.category),
             brief=render_block(mission, "brief"),
             hint=render_block(mission, "hint"),
-            starter=template.format(func=mission.func_name, slug=slug, check=STATUS_CHECK),
+            starter=starter,
+            editor_code=saved.read_text(encoding="utf-8") if saved.exists() else starter,
+            editor_path=saved.relative_to(BASE_DIR).as_posix(),
+            editor_saved=saved.exists(),
+            headless_only=HEADLESS_ONLY,
             solution=load_solutions().get(mission.func_name),
             user_solution=load_solutions(EXERCISES_DIR, expand_helper=False).get(mission.func_name),
             solved_at=read_json(PROGRESS_FILE).get(slug),
@@ -299,9 +326,71 @@ def create_app() -> Flask:
             mark_solved(slug)
         return jsonify(covered=sorted(covered), total=int(data["total"]), complete=complete)
 
+    # ---------- редактор: сохранение и запуск кода ----------
+
+    def save_solution(mission, code) -> Path:
+        path = solution_path(mission)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(code, encoding="utf-8", newline="\n")
+        return path
+
+    def read_code():
+        code = (request.get_json(force=True, silent=True) or {}).get("code")
+        if not isinstance(code, str):
+            abort(400)
+        if len(code) > MAX_CODE_SIZE:
+            abort(413)
+        return code
+
+    @app.put("/api/solution/<slug>")
+    def solution_save(slug):
+        mission = get_mission(slug)
+        if forbidden := runner_forbidden():
+            return forbidden
+        path = save_solution(mission, read_code())
+        return jsonify(ok=True, path=path.relative_to(BASE_DIR).as_posix())
+
+    @app.post("/api/run/<slug>")
+    def solution_run(slug):
+        mission = get_mission(slug)
+        if forbidden := runner_forbidden():
+            return forbidden
+        code = read_code()
+        headed = bool((request.get_json(silent=True) or {}).get("headed")) and not HEADLESS_ONLY
+        lock = run_locks.setdefault(slug, threading.Lock())
+        if not lock.acquire(blocking=False):
+            return jsonify(error="Тест этой миссии уже выполняется — дождись результата"), 409
+        try:
+            path = save_solution(mission, code)
+            # Тест ходит в этот же сервер: прогресс засчитывается как при обычном запуске pytest
+            cmd = [sys.executable, "-m", "pytest", path.relative_to(BASE_DIR).as_posix(),
+                   "-q", "--tb=short", "--color=no", "-p", "no:cacheprovider",
+                   "--base-url", request.host_url.rstrip("/")]
+            if headed:
+                cmd += ["--headed", "--slowmo", "300"]
+            env = {**os.environ, "PYTHONIOENCODING": "utf-8", "LAB_MUTANT": ""}
+            started = time.time()
+            try:
+                proc = subprocess.run(cmd, cwd=BASE_DIR, env=env, capture_output=True, text=True,
+                                      encoding="utf-8", errors="replace", timeout=RUN_TIMEOUT)
+                exit_code, output = proc.returncode, (proc.stdout + proc.stderr).strip()
+            except subprocess.TimeoutExpired:
+                exit_code, output = -1, f"Тест не уложился в {RUN_TIMEOUT} секунд и был остановлен."
+            return jsonify(
+                exit_code=exit_code,
+                output=output[-20_000:],
+                duration=round(time.time() - started, 1),
+                path=path.relative_to(BASE_DIR).as_posix(),
+                solved=slug in read_json(PROGRESS_FILE),
+            )
+        finally:
+            lock.release()
+
     @app.post("/api/verify/<slug>")
     def verify_start(slug):
         mission = get_mission(slug)
+        if forbidden := runner_forbidden():
+            return forbidden
         if not mission.verifiable:
             return jsonify(error="У этой миссии нет проверки verify.py"), 400
         job = verify_jobs.get(slug)
@@ -559,4 +648,7 @@ if __name__ == "__main__":
         port=int(os.environ.get("LAB_PORT", "5000")),
         debug=os.environ.get("LAB_DEBUG", "1") == "1",
         threaded=True,
+        # Автоперезагрузка не должна срабатывать на решения: редактор сохраняет их
+        # прямо во время запроса «Запустить», и перезапуск оборвал бы этот запрос
+        exclude_patterns=["*exercises*", "*tests*", "*test-results*", "*__snapshots__*"],
     )

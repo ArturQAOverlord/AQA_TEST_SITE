@@ -2,9 +2,12 @@ services:
   lab:
     build: .
     ports:
-      - "5000:5000"
+      # Только localhost хоста: редактор на сайте выполняет код, снаружи он доступен быть не должен
+      - "127.0.0.1:5000:5000"
     environment:
       LAB_DATA_DIR: /lab/data
+      LAB_ALLOW_REMOTE_RUN: "1"   # запросы приходят из сети Docker, а не с 127.0.0.1
+      LAB_HEADLESS_ONLY: "1"      # в контейнере нет экрана
     volumes:
       # Твои решения и прогресс живут на хосте — решения можно править в любимой IDE
       - ./exercises:/lab/exercises
