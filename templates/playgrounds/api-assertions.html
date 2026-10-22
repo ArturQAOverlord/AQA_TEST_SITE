@@ -38,8 +38,17 @@ todo = response.json()</code></pre>
     todos.forEach(t => {
       const li = document.createElement('li');
       li.className = 'row';
-      const isMine = String(t.id) === mine;
-      li.innerHTML = `<span>${t.done ? '✅' : '⬜'} ${t.title}</span>` + (isMine ? '<span class="badge green">создана тобой</span>' : '');
+      // title приходит из POST /api/todos, который может прислать кто угодно, —
+      // выводим как текст, иначе был бы хранимый XSS
+      const text = document.createElement('span');
+      text.textContent = `${t.done ? '✅' : '⬜'} ${t.title}`;
+      li.appendChild(text);
+      if (String(t.id) === mine) {
+        const badge = document.createElement('span');
+        badge.className = 'badge green';
+        badge.textContent = 'создана тобой';
+        li.appendChild(badge);
+      }
       ul.appendChild(li);
     });
     const own = todos.find(t => String(t.id) === mine);

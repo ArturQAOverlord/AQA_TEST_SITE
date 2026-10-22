@@ -21,6 +21,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from flask import Flask, Response, abort, jsonify, make_response, render_template, request, send_from_directory
 from flask_sock import Sock
@@ -28,12 +29,16 @@ from jinja2 import TemplateNotFound
 from markupsafe import Markup
 
 from missions import CATEGORIES, MISSIONS, MISSIONS_BY_SLUG, TRACKS, TRACKS_BY_ID
+from qa_course import QUIZZES, QUIZZES_BY_SLUG, TOPICS_BY_ID, answer_text, check_answer
 
 BASE_DIR = Path(__file__).resolve().parent
 # В Docker прогресс хранится в примонтированной папке (LAB_DATA_DIR), локально — рядом с app.py
 DATA_DIR = Path(os.environ.get("LAB_DATA_DIR", BASE_DIR))
 PROGRESS_FILE = DATA_DIR / "progress.json"
 VERIFIED_FILE = DATA_DIR / "verified.json"
+QA_PROGRESS_FILE = DATA_DIR / "qa_progress.json"
+# Тест трека Manual QA считается сданным от 80% верных ответов с первой попытки
+QA_PASS_RATIO = 0.8
 SOLUTIONS_DIR = BASE_DIR / "tests"
 EXERCISES_DIR = BASE_DIR / "exercises"
 # Сюда сохраняет код редактор на странице миссии: exercises/web/test_<миссия>.py
@@ -46,6 +51,13 @@ MAX_CODE_SIZE = 100_000
 ALLOW_REMOTE_RUN = os.environ.get("LAB_ALLOW_REMOTE_RUN") == "1"
 # Без дисплея (Docker) браузер можно запускать только headless
 HEADLESS_ONLY = os.environ.get("LAB_HEADLESS_ONLY") == "1"
+# Запуск кода и сохранение решений доступны только когда сайт открыт как «свой»
+# (loopback-адрес в строке браузера). Это гасит две атаки:
+#  * DNS rebinding — чужой домен, указывающий на 127.0.0.1 (проверяем Host);
+#  * CSRF — запрос, отправленный с чужой вкладки (проверяем Origin).
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+EXTRA_HOSTS = {h.strip() for h in os.environ.get("LAB_ALLOWED_HOSTS", "").split(",") if h.strip()}
+ALLOWED_HOSTS = LOOPBACK_HOSTS | EXTRA_HOSTS
 
 STARTER_TEMPLATE = '''import re
 
@@ -91,7 +103,11 @@ def read_json(path: Path) -> dict:
 
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Запись атомарна: несколько процессов (сервер + параллельные verify.py) пишут
+    # один файл, и читатель не должен увидеть его наполовину записанным.
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def mark_solved(slug: str) -> None:
@@ -121,24 +137,30 @@ def _with_decorators(source: str, node: ast.stmt) -> str:
     return decorators + ast.get_source_segment(source, node)
 
 
-def load_solutions(directory: Path = SOLUTIONS_DIR, expand_helper: bool = True) -> dict[str, str]:
+def load_solutions(directory: Path = SOLUTIONS_DIR, expand_helper: bool = True,
+                   with_imports: bool = False) -> dict[str, str]:
     """Достаёт исходники test_* функций из test_*.py, ключ — имя функции.
 
     Вместе с тестом берутся определения из того же файла, которыми он пользуется
     (Page Object классы, фикстуры, константы), — чтобы решение было полным.
+    with_imports добавляет импорты файла (нужно для редактора: код должен запускаться).
     Хелпер assert_passed(page) разворачивается в полную проверку статуса,
     чтобы решение можно было скопировать в свой файл как есть.
     """
     solutions = {}
     pattern = "test_*.py" if directory == SOLUTIONS_DIR else "**/test_*.py"
-    for path in sorted(directory.glob(pattern)):
-        source = path.read_text(encoding="utf-8")
+    # Свежий файл идёт позже и перекрывает старый с тем же тестом — так на странице
+    # миссии видно последнее решение (своё из IDE или из редактора на сайте).
+    for path in sorted(directory.glob(pattern), key=lambda p: p.stat().st_mtime):
         try:
+            source = path.read_text(encoding="utf-8")
             tree = ast.parse(source)
-        except SyntaxError:
-            continue
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue  # чужой файл не в UTF-8 или с ошибкой не должен ронять страницу
         helpers = {name: node for node in tree.body
                    if (name := _node_name(node)) and not name.startswith("test_") and name != "assert_passed"}
+        imports = [ast.get_source_segment(source, n) for n in tree.body
+                   if isinstance(n, (ast.Import, ast.ImportFrom))]
         for node in tree.body:
             if not (isinstance(node, ast.FunctionDef) and node.name.startswith("test_")):
                 continue
@@ -147,7 +169,9 @@ def load_solutions(directory: Path = SOLUTIONS_DIR, expand_helper: bool = True) 
                 for name in _used_names(queue.pop()) & helpers.keys() - needed:
                     needed.add(name)
                     queue.append(helpers[name])
-            parts = [_with_decorators(source, n) for n in tree.body if _node_name(n) in needed] + [_with_decorators(source, node)]
+            blocks = ([_with_decorators(source, n) for n in tree.body if _node_name(n) in needed]
+                      + [_with_decorators(source, node)])
+            parts = ["\n".join(imports)] * bool(with_imports and imports) + ["\n\n\n".join(blocks)]
             code = "\n\n\n".join(parts)
             if expand_helper:
                 code = code.replace("assert_passed(page)", STATUS_CHECK)
@@ -169,6 +193,13 @@ def forecast_issued_at(fid: str) -> int | None:
 
 def solution_path(mission) -> Path:
     return WEB_SOLUTIONS_DIR / f"{mission.func_name}.py"
+
+
+def qa_summary(qa_progress: dict) -> dict:
+    """Сколько тестов трека Manual QA сдано (лучший результат от QA_PASS_RATIO)."""
+    passed = [slug for slug, r in qa_progress.items()
+              if slug in QUIZZES_BY_SLUG and r["best"] >= QA_PASS_RATIO * r["total"]]
+    return {"passed": set(passed), "total": len(QUIZZES)}
 
 
 def create_app() -> Flask:
@@ -198,10 +229,22 @@ def create_app() -> Flask:
         return bool(request.headers.get("X-Lab-Reference"))
 
     def runner_forbidden():
-        """Ответ 403, если код с этого адреса запускать нельзя (см. ALLOW_REMOTE_RUN)."""
-        if ALLOW_REMOTE_RUN or request.remote_addr in ("127.0.0.1", "::1"):
-            return None
-        return jsonify(error="Запуск тестов разрешён только с компьютера, где работает сайт"), 403
+        """Ответ 403, если запрос на запуск/сохранение кода небезопасен.
+
+        Эти эндпоинты выполняют Python на сервере, поэтому защищаем их от:
+         * DNS rebinding — в заголовке Host должен стоять свой же loopback-адрес;
+         * CSRF — если есть Origin (кросс-доменный fetch), он должен совпадать;
+         * запуска по сети — remote_addr должен быть loopback (кроме Docker).
+        """
+        host = request.host.rsplit(":", 1)[0].strip("[]")
+        if host not in ALLOWED_HOSTS:
+            return jsonify(error="Недопустимый Host — открой сайт по адресу http://127.0.0.1:5000"), 403
+        origin = request.headers.get("Origin")
+        if origin is not None and (urlparse(origin).hostname or "") not in ALLOWED_HOSTS:
+            return jsonify(error="Запрос пришёл с другого сайта и отклонён"), 403
+        if not (ALLOW_REMOTE_RUN or request.remote_addr in ("127.0.0.1", "::1")):
+            return jsonify(error="Запуск тестов разрешён только с компьютера, где работает сайт"), 403
+        return None
 
     def get_mission(slug):
         mission = MISSIONS_BY_SLUG.get(slug)
@@ -221,6 +264,11 @@ def create_app() -> Flask:
     def inject_globals():
         return {"missions_by_slug": MISSIONS_BY_SLUG, "tracks": TRACKS}
 
+    @app.after_request
+    def mark_lab(resp):
+        resp.headers["X-Lab"] = "1"  # маркер «это наша лаборатория» для conftest
+        return resp
+
     # ---------- страницы ----------
 
     @app.get("/")
@@ -228,7 +276,37 @@ def create_app() -> Flask:
         progress = read_json(PROGRESS_FILE)
         groups = [(c, [m for m in MISSIONS if m.category == c.id]) for c in CATEGORIES]
         return render_template("index.html", groups=groups, progress=progress,
-                               verified=read_json(VERIFIED_FILE), total=len(MISSIONS))
+                               verified=read_json(VERIFIED_FILE), total=len(MISSIONS),
+                               qa=qa_summary(read_json(QA_PROGRESS_FILE)))
+
+    # ---------- трек Manual QA ----------
+
+    @app.get("/qa")
+    def qa_index():
+        qa_progress = read_json(QA_PROGRESS_FILE)
+        return render_template("qa/index.html", quizzes=QUIZZES, topics=TOPICS_BY_ID,
+                               results=qa_progress, qa=qa_summary(qa_progress), pass_ratio=QA_PASS_RATIO)
+
+    @app.get("/qa/<slug>")
+    def qa_quiz(slug):
+        quiz = QUIZZES_BY_SLUG.get(slug) or abort(404)
+        idx = QUIZZES.index(quiz)
+        # На страницу уходят вопросы без правильных ответов
+        questions = [{"id": q.id, "kind": q.kind, "text": q.text, "options": list(q.options),
+                      "placeholder": q.placeholder} for q in quiz.questions]
+        return render_template(
+            "qa/quiz.html", quiz=quiz, topic=TOPICS_BY_ID[quiz.topic], questions=questions,
+            result=read_json(QA_PROGRESS_FILE).get(slug), pass_ratio=QA_PASS_RATIO,
+            position=idx + 1, total=len(QUIZZES),
+            next=QUIZZES[idx + 1] if idx + 1 < len(QUIZZES) else None,
+        )
+
+    @app.get("/qa/lab/<name>")
+    def qa_lab(name):
+        try:
+            return render_template(f"qa/labs/{name}.html")
+        except TemplateNotFound:
+            abort(404)
 
     @app.get("/tracks/<track_id>")
     def track_page(track_id):
@@ -252,6 +330,13 @@ def create_app() -> Flask:
         ]
         starter = template.format(func=mission.func_name, slug=slug, check=STATUS_CHECK)
         saved = solution_path(mission)
+        # В редактор — сохранённый файл; иначе последнее решение из exercises/ (чтобы
+        # «Запустить» не затёр его шаблоном); иначе стартовый шаблон.
+        if saved.exists():
+            editor_code = saved.read_text(encoding="utf-8")
+        else:
+            editor_code = load_solutions(EXERCISES_DIR, expand_helper=False,
+                                         with_imports=True).get(mission.func_name, starter)
         return render_template(
             "mission.html",
             mission=mission,
@@ -259,7 +344,7 @@ def create_app() -> Flask:
             brief=render_block(mission, "brief"),
             hint=render_block(mission, "hint"),
             starter=starter,
-            editor_code=saved.read_text(encoding="utf-8") if saved.exists() else starter,
+            editor_code=editor_code,
             editor_path=saved.relative_to(BASE_DIR).as_posix(),
             editor_saved=saved.exists(),
             headless_only=HEADLESS_ONLY,
@@ -311,17 +396,77 @@ def create_app() -> Flask:
         with _file_lock:
             write_json(PROGRESS_FILE, {})
             write_json(VERIFIED_FILE, {})
+            write_json(QA_PROGRESS_FILE, {})
         parts.clear()
         return jsonify(ok=True)
+
+    # ---------- трек Manual QA: проверка ответов и результаты ----------
+
+    @app.post("/api/qa/<slug>/check")
+    def qa_check(slug):
+        quiz = QUIZZES_BY_SLUG.get(slug) or abort(404)
+        data = request.get_json(silent=True) or {}
+        question = next((q for q in quiz.questions if q.id == data.get("qid")), None) or abort(404)
+        return jsonify(
+            correct=check_answer(question, data.get("answer")),
+            correct_ids=sorted(question.answer) if question.kind == "multi"
+            else [question.answer] if question.kind == "single" else [],
+            answer=answer_text(question),
+            explanation=question.explanation,
+        )
+
+    @app.get("/api/qa/progress")
+    def qa_progress_list():
+        return jsonify(read_json(QA_PROGRESS_FILE))
+
+    @app.post("/api/qa/<slug>/result")
+    def qa_result(slug):
+        quiz = QUIZZES_BY_SLUG.get(slug) or abort(404)
+        data = request.get_json(silent=True) or {}
+        score, total = data.get("score"), len(quiz.questions)
+        if not isinstance(score, int) or not 0 <= score <= total:
+            return jsonify(error="score must be an integer from 0 to the number of questions"), 422
+        if is_reference():
+            return jsonify(best=score, total=total, saved=False)
+        with _file_lock:
+            results = read_json(QA_PROGRESS_FILE)
+            previous = results.get(slug, {})
+            results[slug] = {
+                "best": max(score, previous.get("best", 0)),
+                "last": score,
+                "total": total,
+                "attempts": previous.get("attempts", 0) + 1,
+                "at": datetime.now().isoformat(timespec="seconds"),
+            }
+            write_json(QA_PROGRESS_FILE, results)
+        return jsonify(best=results[slug]["best"], total=total, saved=True)
+
+    # --- стенд «найди ответ в DevTools» ---
+
+    @app.get("/api/qa-lab/profile")
+    def qa_lab_profile():
+        return jsonify(id=42, name="Анна Тестова", email="anna@qa.lab", secret_code="QA-7731")
+
+    @app.post("/api/qa-lab/order")
+    def qa_lab_order():
+        return jsonify(error="validation_error", field="phone", message="Поле phone обязательно"), 422
+
+    @app.get("/api/qa-lab/catalog/<int:part>")
+    def qa_lab_catalog(part):
+        return jsonify(part=part, items=[f"Курс {part}.{i}" for i in range(1, 4)])
 
     @app.post("/api/parts/<slug>")
     def parts_mark(slug):
         """Миссии из нескольких тестов (параметризация): засчитываются, когда покрыты все части."""
         get_mission(slug)
-        data = request.get_json(force=True)
+        data = request.get_json(force=True, silent=True) or {}
+        try:
+            total = int(data["total"])
+        except (KeyError, TypeError, ValueError):
+            return jsonify(error="part and total required"), 422
         covered = parts.setdefault((slug, is_reference()), set())
-        covered.add(str(data["part"]))
-        complete = len(covered) >= int(data["total"])
+        covered.add(str(data.get("part")))
+        complete = len(covered) >= total
         if complete and not is_reference() and not mutant_slug:
             mark_solved(slug)
         return jsonify(covered=sorted(covered), total=int(data["total"]), complete=complete)
@@ -334,20 +479,25 @@ def create_app() -> Flask:
         path.write_text(code, encoding="utf-8", newline="\n")
         return path
 
-    def read_code():
-        code = (request.get_json(force=True, silent=True) or {}).get("code")
-        if not isinstance(code, str):
+    def read_payload():
+        # Строго application/json: кросс-доменный fetch не поставит такой заголовок
+        # без preflight, а preflight на этот сервер не пройдёт (нет CORS) — ещё один
+        # барьер против CSRF поверх проверки Origin.
+        if not request.is_json:
+            abort(415)
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get("code"), str):
             abort(400)
-        if len(code) > MAX_CODE_SIZE:
+        if len(data["code"]) > MAX_CODE_SIZE:
             abort(413)
-        return code
+        return data
 
     @app.put("/api/solution/<slug>")
     def solution_save(slug):
         mission = get_mission(slug)
         if forbidden := runner_forbidden():
             return forbidden
-        path = save_solution(mission, read_code())
+        path = save_solution(mission, read_payload()["code"])
         return jsonify(ok=True, path=path.relative_to(BASE_DIR).as_posix())
 
     @app.post("/api/run/<slug>")
@@ -355,8 +505,9 @@ def create_app() -> Flask:
         mission = get_mission(slug)
         if forbidden := runner_forbidden():
             return forbidden
-        code = read_code()
-        headed = bool((request.get_json(silent=True) or {}).get("headed")) and not HEADLESS_ONLY
+        data = read_payload()
+        code = data["code"]
+        headed = bool(data.get("headed")) and not HEADLESS_ONLY
         lock = run_locks.setdefault(slug, threading.Lock())
         if not lock.acquire(blocking=False):
             return jsonify(error="Тест этой миссии уже выполняется — дождись результата"), 409
@@ -546,7 +697,10 @@ def create_app() -> Flask:
     @app.get("/api/forecast/check")
     def api_forecast_check():
         issued = forecast_issued_at(request.args.get("id", ""))
-        since = float(request.args.get("since", 0))
+        try:
+            since = float(request.args.get("since", 0))
+        except ValueError:
+            since = 0.0
         # Ответ «из HAR» — это прогноз, выданный сервером раньше, чем загрузилась страница
         return jsonify(replayed=issued is not None and issued < since)
 

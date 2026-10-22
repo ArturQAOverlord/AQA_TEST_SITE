@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ quiz.title }} — Manual QA{% endblock %}
+{% block content %}
+<div class="crumbs">
+  <a href="{{ url_for('qa_index') }}">Manual QA</a> / {{ topic.title }} · тест {{ position }} из {{ total }}
+</div>
+
+<div class="quiz-layout">
+  <div class="mission-meta">
+    <span class="level level-{{ quiz.level | lower }}">{{ quiz.level }}</span>
+    <span class="muted">{{ quiz.questions | length }} вопросов</span>
+    {% if result %}
+    <span class="{{ 'done-mark' if result.best >= pass_ratio * result.total else 'warn-mark' }}">
+      лучший результат: {{ result.best }}/{{ result.total }}</span>
+    {% endif %}
+  </div>
+  <h1>{{ quiz.title }}</h1>
+  <p class="lead">{{ quiz.summary }}</p>
+
+  {% if quiz.sandbox %}
+  <div class="note">
+    🧪 Это практикум: ответы ищутся на живом стенде.
+    <a class="btn-primary" href="{{ url_for('qa_lab', name=quiz.sandbox) }}" target="_blank">Открыть стенд ↗</a>
+    {% if quiz.sandbox == "devtools" %}<br><span class="muted">Открой стенд, нажми F12 (DevTools) и обнови страницу — часть ответов появляется при загрузке.</span>{% endif %}
+  </div>
+  {% endif %}
+
+  <section class="quiz-card" id="quiz" data-slug="{{ quiz.slug }}" aria-live="polite"></section>
+
+  <nav class="pager">
+    <a href="{{ url_for('qa_index') }}">← Все тесты трека</a>
+    {% if next %}<a href="{{ url_for('qa_quiz', slug=next.slug) }}">{{ next.title }} →</a>{% endif %}
+  </nav>
+</div>
+<script type="application/json" id="quiz-data">{{ {"questions": questions, "next": url_for('qa_quiz', slug=next.slug) if next else None, "pass_ratio": pass_ratio} | tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='quiz.js') }}"></script>
+{% endblock %}

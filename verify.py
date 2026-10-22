@@ -48,7 +48,7 @@ def find_source(directory: Path, func_name: str, test_file: Path | None = None) 
     for path in [test_file] if test_file else sorted(directory.rglob("test_*.py")):
         try:
             module = ast.parse(path.read_text(encoding="utf-8"))
-        except SyntaxError:
+        except (SyntaxError, UnicodeDecodeError, OSError):
             continue
         for node in module.body:
             if isinstance(node, ast.FunctionDef) and node.name == func_name:
@@ -75,7 +75,14 @@ def check_markers(src: TestSource) -> list[str]:
 
 def check_fixtures(src: TestSource) -> list[str]:
     fixtures = {f.name: f for f in top_level(src, ast.FunctionDef) if is_fixture(f)}
-    used = [a.arg for a in src.func.args.args if a.arg in fixtures]
+    # Транзитивно: фикстура теста + фикстуры, которые она принимает параметрами
+    used, queue = set(), [a.arg for a in src.func.args.args if a.arg in fixtures]
+    while queue:
+        name = queue.pop()
+        if name in used:
+            continue
+        used.add(name)
+        queue += [a.arg for a in fixtures[name].args.args if a.arg in fixtures]
     if not used:
         return ["тест не использует собственную фикстуру (объяви её через @pytest.fixture и прими параметром)"]
     if not any("/api/login" in ast.unparse(fixtures[name]) for name in used):
@@ -99,10 +106,14 @@ def check_page_object(src: TestSource) -> list[str]:
 
 def check_allure(src: TestSource) -> list[str]:
     problems = []
-    steps = [item for n in ast.walk(src.func) if isinstance(n, ast.With) for item in n.items
-             if ast.unparse(item.context_expr).startswith("allure.step(")]
-    if len(steps) < 3:
-        problems.append(f"нужно минимум 3 шага with allure.step(...), сейчас {len(steps)}")
+    with_steps = sum(1 for n in ast.walk(src.func) if isinstance(n, ast.With)
+                     for item in n.items if ast.unparse(item.context_expr).startswith("allure.step("))
+    # Шагом считается и with allure.step(...), и вызов функции, помеченной @allure.step
+    step_funcs = {f.name for f in top_level(src, ast.FunctionDef)
+                  if any(ast.unparse(d).startswith("allure.step") for d in f.decorator_list)}
+    decorated_steps = sum(1 for c in calls_in(src.func) if c.split(".")[-1] in step_funcs)
+    if with_steps + decorated_steps < 3:
+        problems.append(f"нужно минимум 3 шага allure.step (with или декоратор), сейчас {with_steps + decorated_steps}")
     if not any(c == "allure.attach" for c in calls_in(src.func)):
         problems.append("нет вложения allure.attach(...) со скриншотом")
     return problems

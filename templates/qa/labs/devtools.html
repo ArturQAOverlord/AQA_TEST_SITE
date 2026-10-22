@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Стенд: DevTools · Manual QA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='play.css') }}">
+</head>
+<body>
+  <main class="playground">
+    <div class="panel stack" style="max-width: 560px">
+      <h1>Учебный кабинет</h1>
+      <p class="muted">Стенд практикума «Найди ответ в DevTools». Открой DevTools (F12) и обнови страницу:
+        часть ответов появляется прямо при загрузке.</p>
+      <div class="row">
+        <button id="profile">Загрузить профиль</button>
+        <button id="order">Оформить заказ</button>
+        <button id="catalog">Загрузить каталог</button>
+      </div>
+      <p id="out" class="muted" role="status"></p>
+      <div data-testid="promo" style="display: none">Промокод: PROMO-DEVTOOLS</div>
+    </div>
+  </main>
+  <script>
+    document.cookie = 'qa_session=sess-42-alpha; path=/; SameSite=Lax';
+    try { localStorage.setItem('qa_theme', 'solarized'); } catch (e) { /* хранилище недоступно */ }
+    console.error('Payment widget failed: ERR_WIDGET_TIMEOUT');
+
+    const out = document.getElementById('out');
+    document.getElementById('profile').addEventListener('click', async () => {
+      const r = await fetch('/api/qa-lab/profile', { headers: { 'X-Request-Source': 'devtools-lab' } });
+      const data = await r.json();
+      out.textContent = `Профиль: ${data.name}`;
+    });
+    document.getElementById('order').addEventListener('click', async () => {
+      const r = await fetch('/api/qa-lab/order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course: 'Playwright Pro', qty: 1 }),
+      });
+      out.textContent = r.ok ? 'Заказ оформлен' : 'Что-то пошло не так. Попробуйте позже.';
+    });
+    document.getElementById('catalog').addEventListener('click', async () => {
+      const parts = await Promise.all([1, 2, 3].map(n => fetch(`/api/qa-lab/catalog/${n}`).then(r => r.json())));
+      out.textContent = `Каталог загружен: ${parts.reduce((s, p) => s + p.items.length, 0)} курсов`;
+    });
+  </script>
+</body>
+</html>

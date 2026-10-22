@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Стенд: регистрация · Manual QA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='play.css') }}">
+</head>
+<body>
+  <main class="playground">
+    <div class="row" style="align-items: flex-start">
+      <form class="panel" id="form" style="flex: 1; min-width: 300px" novalidate>
+        <h1>Регистрация</h1>
+        <div class="field"><label for="name">Имя *</label><input id="name"></div>
+        <div class="field"><label for="surname">Фамилия *</label><input id="surname"></div>
+        <div class="field"><label for="patronymic">Отчество</label><input id="patronymic"></div>
+        <div class="field"><label for="email">Email *</label><input id="email" type="email"></div>
+        {# БАГ стенда: пароль не скрыт (type="text") #}
+        <div class="field"><label for="password">Пароль *</label><input id="password" type="text" autocomplete="off"></div>
+        <div class="field"><label for="confirm">Подтверждение пароля *</label><input id="confirm" type="text" autocomplete="off"></div>
+        <div class="field"><label class="inline"><input type="checkbox" id="subscribe"> Подписаться на рассылку</label></div>
+        <div class="field">
+          <label class="inline"><input type="checkbox" id="terms"> Принимаю
+            <a href="{{ url_for('qa_lab', name='terms') }}" target="_blank">Условия использования</a></label>
+        </div>
+        <ul class="error" role="alert" id="errors"></ul>
+        <button class="primary" type="submit">Зарегестрироваться</button>
+        <p class="ok" id="welcome" role="status"></p>
+      </form>
+
+      <aside class="panel" style="flex: 1; min-width: 280px">
+        <h2>Требования</h2>
+        <ul>
+          <li>Обязательные поля: имя, фамилия, email, пароль, подтверждение пароля, согласие с условиями.</li>
+          <li>Отчество — необязательное поле.</li>
+          <li>Email — в формате <code>имя@домен.зона</code>, например <code>ivan@mail.ru</code>.</li>
+          <li>Пароль — от 8 до 20 символов, без пробелов, при вводе скрыт.</li>
+          <li>Подтверждение должно совпадать с паролем.</li>
+          <li>Чекбокс «Подписаться на рассылку» по умолчанию не отмечен.</li>
+          <li>Ссылка «Условия использования» открывает текст условий.</li>
+          <li>После успешной регистрации показывается «Добро пожаловать, &lt;Имя&gt;!».</li>
+        </ul>
+      </aside>
+    </div>
+  </main>
+  <script>
+    {# Стенд намеренно содержит баги — их ищут в практикуме. Не «исправлять»! #}
+    document.getElementById('form').addEventListener('submit', e => {
+      e.preventDefault();
+      const v = id => document.getElementById(id).value.trim();
+      const password = document.getElementById('password').value;
+      const errors = [];
+      if (!v('name')) errors.push('Укажите имя');
+      if (!v('surname')) errors.push('Укажите фамилию');
+      {# БАГ: в домене не требуется точка — user@mail проходит #}
+      if (!/^[^@\s]+@[^@\s]+$/.test(v('email'))) errors.push('Укажите корректный email');
+      {# БАГ: нижняя граница 7 вместо 8 #}
+      if (password.length < 7 || password.length > 20) errors.push('Пароль должен быть от 8 до 20 символов');
+      if (/\s/.test(password)) errors.push('Пароль не должен содержать пробелы');
+      {# БАГ: совпадение подтверждения с паролем не проверяется #}
+      if (!document.getElementById('confirm').value) errors.push('Подтвердите пароль');
+      if (!document.getElementById('terms').checked) errors.push('Нужно принять условия использования');
+
+      const list = document.getElementById('errors');
+      list.replaceChildren(...errors.map(t => Object.assign(document.createElement('li'), { textContent: t })));
+      const welcome = document.getElementById('welcome');
+      {# БАГ: в приветствии email вместо имени #}
+      welcome.textContent = errors.length ? '' : `Добро пожаловать, ${v('email')}!`;
+    });
+  </script>
+</body>
+</html>

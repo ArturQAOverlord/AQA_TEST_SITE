@@ -54,6 +54,13 @@
       <div class="card-foot"><span>{{ track.slugs | length }} миссий</span><span>{{ done }} / {{ track.slugs | length }}</span></div>
     </a>
     {% endfor %}
+    <a class="card" href="{{ url_for('qa_index') }}">
+      <div class="card-title">Ручное тестирование (Manual QA)</div>
+      <div class="card-summary">Тесты с разбором ответов: теория, тест-дизайн, баг-репорты, веб, DevTools, Postman, SQL и
+        практикумы «найди баг» на живых стендах.</div>
+      <div class="progress-bar small"><div class="progress-fill" style="width: {{ ((qa.passed | length) / qa.total * 100) | round(1) }}%"></div></div>
+      <div class="card-foot"><span>{{ qa.total }} тестов</span><span>{{ qa.passed | length }} / {{ qa.total }} сдано</span></div>
+    </a>
   </div>
 </section>
 

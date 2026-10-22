@@ -74,9 +74,12 @@ def test_click_before_hydration_is_rejected(page: Page):
 
 
 def test_failed_mission_is_not_counted(page: Page):
+    # Проверяем, что провал не меняет прогресс, а не абсолютное его состояние:
+    # progress.json общий и мог уже содержать эту миссию от реального решения
+    before = "test-id" in page.request.get("/api/progress").json()
     page.goto("/play/test-id")
     page.get_by_test_id("plan-basic").click()
     page.get_by_test_id("plan-pro").click()
     assert_failed(page)
-    progress = page.request.get("/api/progress").json()
-    assert "test-id" not in progress
+    after = "test-id" in page.request.get("/api/progress").json()
+    assert before == after

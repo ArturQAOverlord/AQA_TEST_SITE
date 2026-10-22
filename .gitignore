@@ -5,6 +5,8 @@ __pycache__/
 venv/
 progress.json
 verified.json
+qa_progress.json
+.*.tmp
 data/
 test-results/
 allure-results/

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Стенд: корзина · Manual QA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='play.css') }}">
+</head>
+<body>
+  <main class="playground">
+    <div class="row" style="align-items: flex-start">
+      <div style="flex: 2; min-width: 320px" class="stack">
+        <section class="panel">
+          <div class="row" style="justify-content: space-between">
+            <h1 style="margin: 0">Магазин</h1>
+            <button id="sort">Сортировать по цене</button>
+          </div>
+          <ul class="plain" id="products" aria-label="Товары" style="margin-top: 12px"></ul>
+        </section>
+        <section class="panel">
+          <h2>Корзина</h2>
+          <ul class="plain" id="cart" aria-label="Корзина"></ul>
+          <p class="muted" id="empty">Корзина пуста</p>
+          <table id="summary">
+            <tr><td>Товары</td><td data-testid="subtotal"></td></tr>
+            <tr><td>Скидка</td><td data-testid="discount"></td></tr>
+            <tr><td>Доставка</td><td data-testid="delivery"></td></tr>
+            <tr><th>Итого</th><th data-testid="total"></th></tr>
+          </table>
+        </section>
+      </div>
+      <aside class="panel" style="flex: 1; min-width: 260px">
+        <h2>Требования</h2>
+        <ul>
+          <li>Количество одного товара в корзине — от 1 до 10.</li>
+          <li>Товар с пометкой «Нет в наличии» нельзя добавить в корзину.</li>
+          <li>Скидка 10% на товары при сумме товаров от 5000 ₽ включительно.</li>
+          <li>Доставка 300 ₽; при сумме товаров от 3000 ₽ — бесплатно.</li>
+          <li>Суммы показываются с точностью до копеек.</li>
+          <li>«Сортировать по цене» — по возрастанию цены.</li>
+          <li>«Удалить» убирает из корзины выбранный товар.</li>
+        </ul>
+      </aside>
+    </div>
+  </main>
+  <script>
+    {# Стенд намеренно содержит баги — их ищут в практикуме. Не «исправлять»! #}
+    const products = [
+      { id: 1, name: 'Клавиатура', price: 2500, stock: true },
+      { id: 2, name: 'Мышь', price: 1200, stock: true },
+      { id: 3, name: 'Наушники', price: 3300, stock: false },
+      { id: 4, name: 'Коврик', price: 99.99, stock: true },
+    ];
+    const cart = [];
+    const money = n => `${n.toFixed(2)} ₽`;
+
+    function renderProducts() {
+      document.getElementById('products').replaceChildren(...products.map(p => {
+        const li = document.createElement('li');
+        li.className = 'row';
+        li.style.justifyContent = 'space-between';
+        li.style.marginBottom = '8px';
+        li.innerHTML = `<span><b>${p.name}</b> — ${p.price} ₽ ${p.stock ? '' : '<span class="badge red">Нет в наличии</span>'}</span>`;
+        {# БАГ: кнопка активна и для товара, которого нет в наличии #}
+        const add = Object.assign(document.createElement('button'), { textContent: 'В корзину' });
+        add.addEventListener('click', () => {
+          const line = cart.find(l => l.product.id === p.id);
+          if (line) line.qty = Math.min(10, line.qty + 1);
+          else cart.push({ product: p, qty: 1 });
+          renderCart();
+        });
+        li.appendChild(add);
+        return li;
+      }));
+    }
+
+    function renderCart() {
+      document.getElementById('empty').hidden = cart.length > 0;
+      document.getElementById('cart').replaceChildren(...cart.map(line => {
+        const li = document.createElement('li');
+        li.className = 'row';
+        li.style.marginBottom = '8px';
+        {# БАГ: сумма строки без округления — 99.99 × 3 = 299.96999999999997 #}
+        li.innerHTML = `<span style="flex: 1">${line.product.name}</span>
+          <button data-act="minus" aria-label="Уменьшить: ${line.product.name}">−</button>
+          <span data-testid="qty">${line.qty}</span>
+          <button data-act="plus" aria-label="Увеличить: ${line.product.name}" ${line.qty >= 10 ? 'disabled' : ''}>+</button>
+          <span data-testid="line-total" style="width: 170px; text-align: right">${line.product.price * line.qty} ₽</span>
+          <button data-act="remove" aria-label="Удалить: ${line.product.name}">Удалить</button>`;
+        {# БАГ: «−» не останавливается на 1 #}
+        li.querySelector('[data-act=minus]').addEventListener('click', () => { line.qty--; renderCart(); });
+        li.querySelector('[data-act=plus]').addEventListener('click', () => { line.qty = Math.min(10, line.qty + 1); renderCart(); });
+        {# БАГ: удаляется первый товар в корзине, а не выбранный #}
+        li.querySelector('[data-act=remove]').addEventListener('click', () => { cart.splice(0, 1); renderCart(); });
+        return li;
+      }));
+      const subtotal = cart.reduce((s, l) => s + l.product.price * l.qty, 0);
+      {# БАГ: «больше» вместо «больше или равно» — на ровно 5000 скидки нет #}
+      const discount = subtotal > 5000 ? subtotal * 0.1 : 0;
+      const delivery = cart.length && subtotal < 3000 ? 300 : 0;
+      document.querySelector('[data-testid=subtotal]').textContent = money(subtotal);
+      document.querySelector('[data-testid=discount]').textContent = money(discount);
+      document.querySelector('[data-testid=delivery]').textContent = money(delivery);
+      document.querySelector('[data-testid=total]').textContent = money(subtotal - discount + delivery);
+    }
+
+    document.getElementById('sort').addEventListener('click', () => {
+      {# БАГ: цены сравниваются как строки #}
+      products.sort((a, b) => String(a.price).localeCompare(String(b.price)));
+      renderProducts();
+    });
+    renderProducts();
+    renderCart();
+  </script>
+</body>
+</html>

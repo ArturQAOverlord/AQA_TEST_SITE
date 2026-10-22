@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Manual QA — AQA Lab{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('index') }}#tracks">Треки</a> / Manual QA</div>
+<h1>Ручное тестирование (Manual QA)</h1>
+<p class="lead">
+  {{ quizzes | length }} тестов от простого к сложному: теория и процессы, тест-дизайн, баг-репорты, веб,
+  инструменты и практикумы на живых стендах. После каждого ответа — разбор, в конце теста — список ошибок.
+  Тест считается сданным от {{ (pass_ratio * 100) | int }}% верных ответов с первой попытки.
+</p>
+<div class="progress-box">
+  <div class="progress-label"><b>{{ qa.passed | length }} / {{ qa.total }}</b> тестов сдано</div>
+  <div class="progress-bar"><div class="progress-fill" style="width: {{ ((qa.passed | length) / qa.total * 100) | round(1) }}%"></div></div>
+</div>
+
+{% set ns = namespace(next=None) %}
+{% for q in quizzes %}{% if ns.next is none and q.slug not in qa.passed %}{% set ns.next = q %}{% endif %}{% endfor %}
+{% if ns.next %}
+<p><a class="btn-primary" href="{{ url_for('qa_quiz', slug=ns.next.slug) }}">{{ "Начать" if not results else "Продолжить" }}: {{ ns.next.title }} →</a></p>
+{% else %}
+<p class="done-mark">Все тесты трека сданы 🎉</p>
+{% endif %}
+
+<ol class="track-list">
+  {% for q in quizzes %}
+  {% set r = results.get(q.slug) %}
+  <li class="{% if q.slug in qa.passed %}done{% endif %} {% if ns.next and q.slug == ns.next.slug %}current{% endif %}">
+    <span class="track-step">{{ "✓" if q.slug in qa.passed else loop.index }}</span>
+    <a href="{{ url_for('qa_quiz', slug=q.slug) }}">{{ q.title }}</a>
+    <span class="level level-{{ q.level | lower }}">{{ q.level }}</span>
+    <span class="kind-badge">{{ topics[q.topic].title }}</span>
+    {% if q.sandbox %}<span class="kind-badge">🧪 стенд</span>{% endif %}
+    <span class="muted">{{ q.summary }}</span>
+    <span class="spacer"></span>
+    <span class="muted">{{ q.questions | length }} вопр.</span>
+    {% if r %}<span class="{{ 'done-mark' if q.slug in qa.passed else 'warn-mark' }}">лучший: {{ r.best }}/{{ r.total }}</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endblock %}

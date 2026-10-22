@@ -246,6 +246,51 @@ code, pre {
 .run-result pre:empty { display: none; }
 .CodeMirror-hints { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12.5px; z-index: 100; }
 
+.quiz-layout { max-width: 820px; }
+.quiz-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin: 18px 0;
+}
+.quiz-progress { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.quiz-text { font-size: 17px; margin: 6px 0 10px; }
+.quiz-hint { font-size: 13px; margin: 0 0 8px; }
+.quiz-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.quiz-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.quiz-option:hover { border-color: var(--accent-2); }
+.quiz-option input { margin-top: 4px; }
+.quiz-option.opt-correct { border-color: var(--accent); background: rgba(69, 186, 75, .12); }
+.quiz-option.opt-wrong { border-color: var(--hard); background: rgba(248, 81, 73, .12); }
+.quiz-input {
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0a0d12;
+  color: var(--text);
+  font: inherit;
+  margin-bottom: 12px;
+}
+.quiz-feedback { margin-top: 14px; padding: 12px 16px; border-radius: 10px; border-left: 4px solid; }
+.quiz-feedback.ok { border-color: var(--accent); background: rgba(69, 186, 75, .08); }
+.quiz-feedback.fail { border-color: var(--hard); background: rgba(248, 81, 73, .08); }
+.quiz-verdict { font-weight: 700; margin: 0 0 6px; }
+.quiz-score { margin-top: 0; }
+.quiz-mistakes li { margin-bottom: 18px; }
+.track-list .spacer { flex: 1; }
+
 .kind-badge {
   font-size: 12px;
   padding: 2px 8px;
