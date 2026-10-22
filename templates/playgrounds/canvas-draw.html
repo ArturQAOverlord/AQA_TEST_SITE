@@ -1,0 +1,65 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Договор нужно подписать: нарисуй подпись мышью на холсте.</p>
+<p>Подпись засчитывается, если линия проведена <b>одним движением</b> (без отпускания кнопки),
+  её длина не меньше <b>300 px</b> и она заходит и в левую, и в правую половину холста. Потом нажми «Подписать».</p>
+<p>У canvas нет DOM-элементов внутри — работаем координатами.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>box = page.get_by_test_id("signature").bounding_box()
+page.mouse.move(box["x"] + 20, box["y"] + box["height"] / 2)
+page.mouse.down()
+page.mouse.move(box["x"] + box["width"] - 20, box["y"] + 40, steps=25)
+page.mouse.up()</code></pre>
+<p><code>steps</code> важен: без него мышь «телепортируется», и страница получит одно событие mousemove вместо плавной линии.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 460px">
+  <h3>Подпись</h3>
+  <canvas data-testid="signature" width="420" height="180" style="border:1px dashed #9aa5bd; border-radius:8px; background:#fff; touch-action:none"></canvas>
+  <div class="row"><button id="clear">Очистить</button><button class="primary" id="sign">Подписать</button></div>
+  <p class="muted" id="stats"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#1f2430';
+  let drawing = false, best = null, cur = null;
+  const pos = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  canvas.addEventListener('mousedown', e => {
+    drawing = true;
+    const p = pos(e);
+    cur = { len: 0, minX: p.x, maxX: p.x, moves: 0, last: p };
+    ctx.beginPath(); ctx.moveTo(p.x, p.y);
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (!drawing) return;
+    const p = pos(e);
+    cur.len += Math.hypot(p.x - cur.last.x, p.y - cur.last.y);
+    cur.minX = Math.min(cur.minX, p.x); cur.maxX = Math.max(cur.maxX, p.x);
+    cur.moves++; cur.last = p;
+    ctx.lineTo(p.x, p.y); ctx.stroke();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!drawing) return;
+    drawing = false;
+    if (!best || cur.len > best.len) best = cur;
+    document.getElementById('stats').textContent = `Длина линии: ${Math.round(cur.len)} px, событий движения: ${cur.moves}`;
+  });
+  document.getElementById('clear').addEventListener('click', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); best = null; });
+  document.getElementById('sign').addEventListener('click', () => {
+    if (!best) return Lab.fail('холст пуст');
+    const half = canvas.width / 2;
+    if (best.len < 300) return Lab.fail(`линия слишком короткая: ${Math.round(best.len)} px`);
+    if (best.minX > half || best.maxX < half) return Lab.fail('подпись должна пересекать середину холста');
+    if (best.moves < 5) return Lab.fail('линия нарисована одним скачком — добавь steps в mouse.move');
+    Lab.success('Договор подписан');
+  });
+</script>
+{% endblock %}

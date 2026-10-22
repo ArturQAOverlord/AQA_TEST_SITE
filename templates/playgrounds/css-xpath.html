@@ -1,0 +1,44 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Старая админка: сплошные <code>&lt;div&gt;</code>, у «кнопок» нет ролей, текста и test-id —
+  только иконки и атрибуты <code>data-action</code>.</p>
+<p>Отправь в архив заказ <b>#A-1042</b> — нажми его «кнопку» с <code>data-action="archive"</code>.</p>
+<p>Попрактикуйся и в CSS, и в XPath: решение одной строкой можно написать на любом из них.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Ловушка: есть ещё заказ <b>#A-10421</b>, поэтому <code>filter(has_text="#A-1042")</code> найдёт две строки.
+  Нужно точное совпадение текста.</p>
+<p>CSS + фильтр Playwright:</p>
+<pre><code>row = page.locator("div.order-row").filter(has=page.get_by_text("#A-1042", exact=True))
+row.locator("[data-action=archive]").click()</code></pre>
+<p>Чистый XPath — от текста вверх к строке и вниз к кнопке:</p>
+<pre><code>//span[text()='#A-1042']/ancestor::div[contains(@class,'order-row')]//div[@data-action='archive']</code></pre>
+{% endblock %}
+
+{% block content %}
+<div id="orders" class="panel">
+  {% for order, client, sum in [("#A-1041", "ООО Ромашка", "12 400"), ("#A-1042", "ИП Лютиков", "3 150"), ("#A-1043", "ООО Ромашка", "8 900"), ("#A-10421", "ЗАО Вектор", "1 000")] %}
+  <div class="order-row row" style="padding: 8px 0; border-bottom: 1px solid #eee">
+    <span class="order-num" style="width: 90px">{{ order }}</span>
+    <span style="flex: 1">{{ client }}</span>
+    <span style="width: 80px">{{ sum }} ₽</span>
+    <div data-action="edit" data-order="{{ order }}" style="cursor:pointer">✏️</div>
+    <div data-action="archive" data-order="{{ order }}" style="cursor:pointer">🗄️</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('[data-action]').forEach(el => el.addEventListener('click', () => {
+    const { action, order } = el.dataset;
+    if (action === 'archive' && order === '#A-1042') {
+      el.closest('.order-row').style.opacity = .4;
+      Lab.success('Заказ #A-1042 в архиве');
+    } else Lab.fail(`Нажато ${action} у заказа ${order}`);
+  }));
+</script>
+{% endblock %}

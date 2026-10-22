@@ -1,0 +1,53 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Поиск пакетов с автокомплитом. Подсказки появляются только при <b>реальных нажатиях клавиш</b>
+  (компонент слушает <code>keydown</code>), поэтому <code>fill()</code> их не вызовет.</p>
+<p>Напечатай <code>pytest</code> и выбери в подсказках <b>pytest-playwright</b>.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.get_by_placeholder("Найти пакет").press_sequentially("pytest", delay=100)
+page.get_by_role("option", name="pytest-playwright").click()</code></pre>
+<p>Раньше для этого был <code>type()</code> — он устарел и заменён на <code>press_sequentially()</code>.</p>
+<p>Нюанс: символы, которых нет на US-раскладке (например, кириллицу), Playwright вводит без событий
+  <code>keydown</code>/<code>keyup</code> — только <code>input</code>. Поэтому в таком компоненте русский текст не сработал бы.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 400px; position: relative">
+  <label for="pkg" class="muted">Пакет PyPI</label>
+  <input id="pkg" placeholder="Найти пакет" autocomplete="off" style="width: 100%">
+  <ul role="listbox" id="suggest" class="plain card hidden" style="position:absolute; left:18px; right:18px; padding:4px"></ul>
+  <p id="chosen" class="muted"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const packages = ['pytest', 'pytest-playwright', 'pytest-xdist', 'pytest-asyncio', 'pytest-html', 'playwright', 'pydantic', 'requests'];
+  const input = document.getElementById('pkg');
+  const box = document.getElementById('suggest');
+  let typed = '';
+  input.addEventListener('keydown', e => {
+    if (e.key.length === 1) typed += e.key;
+    else if (e.key === 'Backspace') typed = typed.slice(0, -1);
+    else return;
+    setTimeout(render, 50);
+  });
+  input.addEventListener('input', () => { if (input.value !== typed) box.classList.add('hidden'); });
+  function render() {
+    const q = typed.toLowerCase();
+    const found = q ? packages.filter(p => p.startsWith(q)) : [];
+    box.innerHTML = found.map(p => `<li role="option" style="padding:6px; cursor:pointer">${p}</li>`).join('');
+    box.classList.toggle('hidden', !found.length);
+    box.querySelectorAll('li').forEach(li => li.addEventListener('click', () => {
+      input.value = li.textContent;
+      box.classList.add('hidden');
+      document.getElementById('chosen').textContent = 'Выбран пакет: ' + li.textContent;
+      if (li.textContent === 'pytest-playwright') Lab.success('pytest-playwright выбран');
+      else Lab.fail('Выбран другой пакет');
+    }));
+  }
+</script>
+{% endblock %}

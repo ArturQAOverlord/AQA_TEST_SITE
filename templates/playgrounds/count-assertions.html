@@ -1,0 +1,61 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<ol>
+  <li>Добавь в корзину три любых товара.</li>
+  <li>Проверь, что в списке корзины <b>3</b> позиции, а бейдж у заголовка показывает <b>3</b>.</li>
+  <li>Удали одну позицию из корзины.</li>
+  <li>Проверь, что осталось <b>2</b> позиции и бейдж показывает <b>2</b>.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p><code>expect(locator).to_have_count(3)</code> сам дождётся нужного количества — в отличие от
+  <code>assert locator.count() == 3</code>, который проверяет один раз и сразу.</p>
+<p>Список корзины — <code>page.get_by_role("list", name="Корзина")</code>, бейдж — <code>get_by_test_id("cart-count")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="row" style="align-items: flex-start">
+  <div class="panel" style="flex: 1">
+    <h3>Товары</h3>
+    <ul class="plain" id="catalog">
+      {% for p in ["Кружка", "Футболка", "Стикеры", "Блокнот", "Рюкзак"] %}
+      <li class="row" style="justify-content: space-between"><span>{{ p }}</span><button data-product="{{ p }}">Добавить</button></li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="panel" style="flex: 1">
+    <h3>Корзина <span class="badge" data-testid="cart-count" id="count">0</span></h3>
+    <ul class="plain" id="cart" aria-label="Корзина"></ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const cart = document.getElementById('cart');
+  let added = 0;
+  const update = () => { document.getElementById('count').textContent = cart.children.length; };
+  function addItem(name) {
+    const li = document.createElement('li');
+    li.className = 'row';
+    li.style.justifyContent = 'space-between';
+    li.innerHTML = `<span>${name}</span><button>Убрать</button>`;
+    li.querySelector('button').addEventListener('click', () => {
+      if (Lab.mutant !== 'remove-noop') li.remove();
+      if (Lab.mutant !== 'badge-stale') update();
+      // Засчитывается действие из задания: убрали позицию после трёх добавлений
+      if (added >= 3) Lab.success('Корзина пересчитана — проверь количество');
+      else Lab.fail('сначала нужно добавить три товара');
+    });
+    cart.appendChild(li);
+  }
+  document.querySelectorAll('[data-product]').forEach(b => b.addEventListener('click', () => {
+    added++;
+    addItem(b.dataset.product);
+    if (Lab.mutant === 'double-add' && added === 1) addItem(b.dataset.product);
+    update();
+  }));
+</script>
+{% endblock %}

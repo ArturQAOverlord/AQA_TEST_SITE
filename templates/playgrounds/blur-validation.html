@@ -1,0 +1,42 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Поле email проверяется, когда <b>теряет фокус</b> (событие <code>blur</code>), а не при вводе.</p>
+<ol>
+  <li>Введи <code>ivan@</code> и убери фокус с поля — должна появиться ошибка «Введите корректный email».</li>
+  <li>Исправь на <code>ivan@aqa.lab</code>, снова убери фокус — ошибка пропадёт, а кнопка «Сохранить» станет активной.</li>
+  <li>Нажми «Сохранить».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p><code>fill()</code> фокусирует поле, но не уводит фокус. Сделай это явно: <code>locator.blur()</code>
+  или <code>locator.press("Tab")</code> — как сделал бы пользователь.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" style="max-width: 380px" id="form" novalidate>
+  <div class="field"><label for="email">Email</label><input id="email" type="email"></div>
+  <p class="error hidden" role="alert" id="err">Введите корректный email</p>
+  <div class="field"><label for="name">Имя</label><input id="name"></div>
+  <button class="primary" type="submit" id="save" disabled>Сохранить</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  const email = document.getElementById('email');
+  let sawError = false;
+  email.addEventListener('blur', () => {
+    const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value.trim());
+    document.getElementById('err').classList.toggle('hidden', valid);
+    document.getElementById('save').disabled = !valid;
+    if (!valid && email.value) sawError = true;
+  });
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    if (!sawError) return Lab.fail('пропущен шаг с ошибкой валидации');
+    Lab.success('Email сохранён');
+  });
+</script>
+{% endblock %}

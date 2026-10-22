@@ -1,0 +1,47 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Проверим доступность: скринридер должен понимать, что это за элементы.</p>
+<ol>
+  <li>Нажми «Открыть настройки» и проверь, что появился диалог (роль <code>dialog</code>) с доступным именем
+    <b>«Настройки профиля»</b>.</li>
+  <li>У кнопки-иконки ✕ в диалоге доступное имя должно быть <b>«Закрыть»</b>.</li>
+  <li>У поля «Новый пароль» доступное описание — <b>«Не менее 8 символов»</b>.</li>
+  <li>Значок 🔔 сверху — это кнопка (роль <code>button</code>), хотя сделан из <code>&lt;span&gt;</code>.</li>
+  <li>Закрой диалог кнопкой «Закрыть» и проверь, что его больше не видно.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>expect(dialog).to_have_accessible_name("Настройки профиля")
+expect(page.get_by_label("Новый пароль")).to_have_accessible_description("Не менее 8 символов")
+expect(page.get_by_test_id("bell")).to_have_role("button")</code></pre>
+<p>Подумай, как найти ✕, чтобы тест упал, если у неё пропадёт <code>aria-label</code>.
+  Подсказка: локатор <code>get_by_role("button", name="Закрыть")</code> сам по себе уже проверяет имя.</p>
+{% endblock %}
+
+{% block content %}
+<div class="row" style="justify-content: space-between; margin-bottom: 16px">
+  <h2 style="margin:0">Профиль</h2>
+  <span role="button" tabindex="0" aria-label="Уведомления" data-testid="bell" style="font-size: 22px; cursor:pointer">🔔</span>
+</div>
+<button class="primary" id="open">Открыть настройки</button>
+<div class="overlay hidden" id="ov">
+  <div class="modal stack" role="dialog" {% if mutant != "dialog-no-name" %}aria-labelledby="dlg-title"{% endif %} style="position: relative">
+    <button {% if mutant != "close-no-label" %}aria-label="Закрыть"{% endif %} id="close"
+            style="position:absolute; top:8px; right:8px; border:0">✕</button>
+    <h3 id="dlg-title">Настройки профиля</h3>
+    <label for="pwd">Новый пароль</label>
+    <input id="pwd" type="password" {% if mutant != "no-description" %}aria-describedby="pwd-hint"{% endif %}>
+    <small id="pwd-hint" class="muted">Не менее 8 символов</small>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const ov = document.getElementById('ov');
+  document.getElementById('open').addEventListener('click', () => { ov.classList.remove('hidden'); Lab.success('Диалог открыт — проверь доступность'); });
+  document.getElementById('close').addEventListener('click', () => ov.classList.add('hidden'));
+</script>
+{% endblock %}

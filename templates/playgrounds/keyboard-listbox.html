@@ -1,0 +1,67 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Кастомный выпадающий список «Основной язык» сделан по паттерну ARIA combobox и управляется
+  <b>только с клавиатуры</b>: клик мышью по пункту засчитывается как ошибка.</p>
+<ul>
+  <li>Фокус на поле + <kbd>ArrowDown</kbd> или <kbd>Enter</kbd> — открыть список;</li>
+  <li><kbd>ArrowDown</kbd> / <kbd>ArrowUp</kbd> — двигать подсветку;</li>
+  <li><kbd>Enter</kbd> — выбрать подсвеченный пункт.</li>
+</ul>
+<p>Выбери <b>Python</b>. Порядок пунктов случайный.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Подсвеченный пункт хранится в <code>aria-activedescendant</code> у combobox и в <code>aria-selected="true"</code> у пункта.
+  Жми стрелку, пока подсвеченным не станет нужный:</p>
+<pre><code>combo = page.get_by_role("combobox", name="Основной язык")
+combo.focus()
+combo.press("ArrowDown")
+for _ in range(10):
+    if page.get_by_role("option", name="Python", selected=True).count():
+        break
+    combo.press("ArrowDown")
+combo.press("Enter")</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 360px; position: relative">
+  <label id="lbl" class="muted" style="font-size: 13px">Основной язык</label>
+  <div role="combobox" tabindex="0" aria-labelledby="lbl" aria-expanded="false" aria-controls="lb" id="combo"
+       style="border:1px solid #c9d1e0; border-radius:8px; padding:8px 10px; background:#fff">Не выбрано</div>
+  <ul role="listbox" id="lb" class="plain card hidden" style="position:absolute; left:18px; right:18px; padding:4px"></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const langs = ['Java', 'JavaScript', 'Kotlin', 'Python', 'Rust', 'TypeScript'].sort(() => Math.random() - .5);
+  const combo = document.getElementById('combo');
+  const lb = document.getElementById('lb');
+  let active = -1;
+  lb.innerHTML = langs.map((l, i) => `<li role="option" id="opt${i}" aria-selected="false" style="padding:6px">${l}</li>`).join('');
+  const opts = [...lb.children];
+  function highlight(i) {
+    active = (i + opts.length) % opts.length;
+    opts.forEach((o, j) => { o.setAttribute('aria-selected', String(j === active)); o.style.background = j === active ? '#eef2ff' : ''; });
+    combo.setAttribute('aria-activedescendant', opts[active].id);
+  }
+  const open = () => { lb.classList.remove('hidden'); combo.setAttribute('aria-expanded', 'true'); if (active < 0) highlight(0); };
+  const close = () => { lb.classList.add('hidden'); combo.setAttribute('aria-expanded', 'false'); };
+  combo.addEventListener('keydown', e => {
+    const isOpen = combo.getAttribute('aria-expanded') === 'true';
+    if (e.key === 'ArrowDown') { e.preventDefault(); isOpen ? highlight(active + 1) : open(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (isOpen) highlight(active - 1); }
+    else if (e.key === 'Escape') close();
+    else if (e.key === 'Enter') {
+      if (!isOpen) return open();
+      const lang = opts[active].textContent;
+      combo.textContent = lang;
+      close();
+      if (lang === 'Python') Lab.success('Python выбран с клавиатуры');
+      else Lab.fail('выбран ' + lang);
+    }
+  });
+  lb.addEventListener('mousedown', e => { e.preventDefault(); Lab.fail('этот список не поддерживает мышь — используй клавиатуру'); });
+</script>
+{% endblock %}

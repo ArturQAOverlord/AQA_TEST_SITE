@@ -1,0 +1,61 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Кнопка «Отправить заявку» очень капризная:</p>
+<ol>
+  <li>первые ~1,5 секунды она <b>disabled</b>;</li>
+  <li>потом ~1,5 секунды её <b>перекрывает</b> полупрозрачный слой «Проверяем форму…»;</li>
+  <li>потом она секунду <b>уезжает</b> вправо (анимация).</li>
+</ol>
+<p>Нажми её одной строкой кода — без <code>sleep</code>, <code>force=True</code> и JS-кликов.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Перед кликом Playwright сам проверяет <i>actionability</i>: элемент виден, стабилен (не двигается),
+  получает события (ничем не перекрыт) и enabled. Просто вызови <code>click()</code> — и посмотри в
+  <code>--headed</code> режиме, как он терпеливо ждёт.</p>
+<p><code>force=True</code> отключает эти проверки — именно поэтому им почти никогда не надо пользоваться.</p>
+{% endblock %}
+
+{% block head %}
+<style>
+  #submit { position: relative; left: 0; transition: left 1s ease-in-out; }
+  #submit.moved { left: 220px; }
+  #cover { position: absolute; inset: 0; background: rgba(255,255,255,.75); display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="position: relative; height: 160px; max-width: 520px">
+  <p class="muted" id="phase">Подготовка…</p>
+  <button class="primary" id="submit" disabled>Отправить заявку</button>
+  <div id="cover" class="hidden">Проверяем форму…</div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const btn = document.getElementById('submit');
+  const cover = document.getElementById('cover');
+  let ready = false;
+  (async () => {
+    await Lab.sleep(1500);
+    btn.disabled = false;
+    cover.classList.remove('hidden');
+    document.getElementById('phase').textContent = 'Проверка…';
+    await Lab.sleep(1500);
+    cover.classList.add('hidden');
+    btn.classList.add('moved');
+    document.getElementById('phase').textContent = 'Почти готово…';
+    // Чуть раньше конца анимации, чтобы честный click() (ждущий стабильности) не гонялся с таймером
+    await Lab.sleep(850);
+    ready = true;
+    document.getElementById('phase').textContent = 'Можно отправлять';
+  })();
+  btn.addEventListener('click', () => {
+    if (!cover.classList.contains('hidden')) return Lab.fail('клик прошёл сквозь оверлей — похоже на force=True');
+    if (!ready) return Lab.fail('клик по движущейся кнопке — похоже на force=True');
+    Lab.success('Заявка отправлена');
+  });
+</script>
+{% endblock %}

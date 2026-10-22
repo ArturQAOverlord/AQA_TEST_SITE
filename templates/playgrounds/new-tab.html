@@ -1,0 +1,37 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Чтобы активировать лицензию, нужен код из документации. Ссылка «Открыть документацию» открывается
+  <b>в новой вкладке</b>.</p>
+<p>Открой её, прочитай код активации, вернись на исходную страницу, введи код и нажми «Активировать».
+  Код генерируется заново при каждой загрузке документации.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>with page.expect_popup() as popup_info:
+    page.get_by_role("link", name="Открыть документацию").click()
+docs = popup_info.value
+code = docs.get_by_test_id("activation-code").inner_text()</code></pre>
+<p>Исходная вкладка — это по-прежнему <code>page</code>. Новые вкладки, открытые не через popup, ловят через
+  <code>page.context.expect_page()</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Активация лицензии</h3>
+  <p><a href="{{ url_for('playground_subpage', slug=mission.slug, page='docs') }}" target="_blank">Открыть документацию</a></p>
+  <div class="field"><label for="code">Код активации</label><input id="code"></div>
+  <button class="primary" id="activate">Активировать</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('activate').addEventListener('click', async () => {
+    const code = document.getElementById('code').value.trim();
+    const issued = await (async () => { try { return localStorage.getItem('lab-activation-code'); } catch { return null; } })();
+    if (issued && code === issued) Lab.success('Лицензия активирована');
+    else Lab.fail('Неверный код');
+  });
+</script>
+{% endblock %}

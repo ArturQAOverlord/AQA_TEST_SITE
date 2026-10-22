@@ -1,0 +1,60 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Две формы загрузки:</p>
+<ol>
+  <li><b>Аватар.</b> Настоящий <code>&lt;input type="file"&gt;</code> скрыт, видна только красивая кнопка.
+    Загрузи в него любой файл <code>.png</code>.</li>
+  <li><b>Отчёт.</b> Кнопка «Прикрепить отчёт» открывает системное окно выбора файла.
+    Загрузи файл с именем <code>report.csv</code>.</li>
+</ol>
+<p>Файлы не обязательно должны существовать на диске.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Скрытому input можно передать файл напрямую, даже из памяти:</p>
+<pre><code>page.get_by_label("Аватар").set_input_files(
+    files=[{"name": "me.png", "mimeType": "image/png", "buffer": b"fake"}]
+)</code></pre>
+<p>Системное окно перехватывают так:</p>
+<pre><code>with page.expect_file_chooser() as fc_info:
+    page.get_by_role("button", name="Прикрепить отчёт").click()
+fc_info.value.set_files(...)</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <div>
+    <label class="btn" for="avatar" style="display:inline-block">🖼 Выбрать аватар</label>
+    <input type="file" id="avatar" aria-label="Аватар" accept="image/*" style="display:none">
+    <span id="avatar-name" class="muted"></span>
+  </div>
+  <div>
+    <button id="attach">📎 Прикрепить отчёт</button>
+    <input type="file" id="report" style="display:none">
+    <span id="report-name" class="muted"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const state = { avatar: false, report: false };
+  const check = () => { if (state.avatar && state.report) Lab.success('Оба файла загружены'); };
+  document.getElementById('avatar').addEventListener('change', e => {
+    const f = e.target.files[0];
+    document.getElementById('avatar-name').textContent = f ? f.name : '';
+    state.avatar = !!f && f.name.toLowerCase().endsWith('.png');
+    if (f && !state.avatar) Lab.fail('Аватар должен быть .png');
+    check();
+  });
+  document.getElementById('attach').addEventListener('click', () => Lab.internal(() => document.getElementById('report').click()));
+  document.getElementById('report').addEventListener('change', e => {
+    const f = e.target.files[0];
+    document.getElementById('report-name').textContent = f ? f.name : '';
+    state.report = !!f && f.name === 'report.csv';
+    if (f && !state.report) Lab.fail('Отчёт должен называться report.csv');
+    check();
+  });
+</script>
+{% endblock %}

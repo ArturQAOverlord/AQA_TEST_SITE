@@ -1,0 +1,40 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Почтовый клиент с двумя папками. В обеих лежат письма с одинаковыми темами.</p>
+<p>Открой письмо <b>«Отчёт за квартал»</b> из папки <b>«Отправленные»</b>.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Локаторы можно сужать цепочкой: каждый следующий ищет внутри предыдущего. Папки размечены как
+  <code>&lt;section aria-label="..."&gt;</code>, у такой секции роль <code>region</code>:</p>
+<pre><code>page.get_by_role("region", name="Отправленные").get_by_role("listitem").filter(...)...</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="row" style="align-items: flex-start">
+  {% for folder in ["Входящие", "Отправленные"] %}
+  <section aria-label="{{ folder }}" class="panel" style="flex:1" data-folder="{{ folder }}">
+    <h3>{{ folder }}</h3>
+    <ul class="plain">
+      {% for subject in ["Встреча в понедельник", "Отчёт за квартал", "Отчёт за квартал — черновик"] %}
+      <li class="card row"><span style="flex:1">{{ subject }}</span><button data-subject="{{ subject }}">Открыть</button></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+<p id="opened" class="muted"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('[data-subject]').forEach(btn => btn.addEventListener('click', () => {
+    const folder = btn.closest('section').dataset.folder;
+    const subject = btn.dataset.subject;
+    document.getElementById('opened').textContent = `Открыто: ${folder} → ${subject}`;
+    if (folder === 'Отправленные' && subject === 'Отчёт за квартал') Lab.success('Нужное письмо открыто');
+    else Lab.fail(`Открыто не то письмо: ${folder} → ${subject}`);
+  }));
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Мини-админка магазина из двух страниц: вход (<code>/play/page-object</code>) и товары
+  (<code>/play/page-object/products</code>). Учётка: <code>student</code> / <code>playwright123</code>.</p>
+<p>Добавь три товара и проверь, что они появились в таблице:</p>
+<table>
+  <tr><th>Название</th><th>Цена</th><th>Категория</th></tr>
+  <tr><td>Клавиатура</td><td>4990</td><td>Периферия</td></tr>
+  <tr><td>Монитор</td><td>19990</td><td>Мониторы</td></tr>
+  <tr><td>Мышь</td><td>1990</td><td>Периферия</td></tr>
+</table>
+<p>Главное — <b>как</b> написан тест. Сделай два класса Page Object — <code>LoginPage</code> и <code>ProductsPage</code> —
+  и держи все локаторы в них. В самой функции теста не должно быть ни одного <code>get_by_…</code> и <code>locator</code>:
+  проверка задания разбирает код.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>class LoginPage:
+    def __init__(self, page: Page):
+        self.page = page
+        self.username = page.get_by_label("Логин")
+        ...
+
+    def open(self) -> "LoginPage":
+        self.page.goto("/play/page-object")
+        return self
+
+    def login(self, username: str, password: str) -> "ProductsPage":
+        ...
+        return ProductsPage(self.page)</code></pre>
+<p>Метод, который ведёт на другую страницу, возвращает её Page Object — тест читается как цепочка:
+  <code>LoginPage(page).open().login(...).add_product(...)</code>. Проверки (<code>expect</code>) обычно оставляют в тесте,
+  а Page Object отдаёт локаторы и умеет выполнять действия.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="form" style="max-width: 360px">
+  <h2>Админка: вход</h2>
+  <div class="field"><label for="u">Логин</label><input id="u" autocomplete="off"></div>
+  <div class="field"><label for="p">Пароль</label><input id="p" type="password"></div>
+  <p class="error" role="alert" id="err"></p>
+  <button class="primary" type="submit">Войти</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value }) });
+    if (!r.ok) { document.getElementById('err').textContent = 'Неверный логин или пароль'; return; }
+    location.href = '{{ url_for("playground_subpage", slug=mission.slug, page="products") }}';
+  });
+</script>
+{% endblock %}

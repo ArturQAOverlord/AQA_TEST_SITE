@@ -1,0 +1,51 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Биржевой стакан: список перерисовывается <b>каждые 0,7 секунды</b> — все DOM-узлы заменяются новыми.
+  Цена «Товара B» стартует с 1500 ₽ и снижается на 50 ₽ за тик (до 900 ₽).</p>
+<p>Купи «Товар B», как только его цена станет <b>ниже 1000 ₽</b>. Покупка дороже — провал.</p>
+<p>Попробуй ради интереса <code>handle = page.query_selector(...)</code> и клик по нему через пару секунд — получишь
+  ошибку «Element is not attached to the DOM». Локаторы такой проблемы не имеют: они ищут элемент заново перед каждым действием.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Дождись нужной цены регуляркой (это займёт ~8 секунд — больше стандартного таймаута), потом кликай:</p>
+<pre><code>row = page.get_by_role("listitem").filter(has_text="Товар B")
+expect(row.get_by_test_id("price")).to_have_text(re.compile(r"^9\d\d ₽$"), timeout=15_000)
+row.get_by_role("button", name="Купить").click()</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 420px">
+  <h3>Котировки</h3>
+  <ul class="plain" id="list"></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const items = [{ name: 'Товар A', price: 2100 }, { name: 'Товар B', price: 1500 }, { name: 'Товар C', price: 700 }];
+  function render() {
+    const ul = document.getElementById('list');
+    ul.innerHTML = '';
+    items.forEach(it => {
+      const li = document.createElement('li');
+      li.className = 'row';
+      li.style.justifyContent = 'space-between';
+      li.innerHTML = `<span>${it.name}</span><span data-testid="price">${it.price} ₽</span><button>Купить</button>`;
+      li.querySelector('button').addEventListener('click', () => {
+        if (it.name !== 'Товар B') return Lab.fail('куплен не тот товар: ' + it.name);
+        if (it.price >= 1000) return Lab.fail(`слишком рано: цена ${it.price} ₽`);
+        Lab.success(`Куплено за ${it.price} ₽`);
+      });
+      ul.appendChild(li);
+    });
+  }
+  render();
+  setInterval(() => {
+    items[1].price = Math.max(900, items[1].price - 50);
+    items[0].price += Lab.rand(-20, 20);
+    render();
+  }, 700);
+</script>
+{% endblock %}

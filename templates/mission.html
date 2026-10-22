@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}{{ mission.title }} — AQA Lab{% endblock %}
+{% block content %}
+<div class="crumbs">
+  <a href="{{ url_for('index') }}#catalog">Миссии</a> / <a href="{{ url_for('index') }}#cat-{{ category.id }}">{{ category.title }}</a>
+  {% for track, pos, _ in in_tracks %} · <a href="{{ url_for('track_page', track_id=track.id) }}">Трек «{{ track.title }}»: {{ pos + 1 }}/{{ track.slugs | length }}</a>{% endfor %}
+</div>
+
+<div class="mission-layout">
+  <section class="mission-brief">
+    <div class="mission-meta">
+      <span class="level level-{{ mission.level | lower }}">{{ mission.level }}</span>
+      <span class="muted">~{{ mission.minutes }} мин</span>
+      {% if mission.kind == "bug" %}<span class="kind-badge">🔍 найди баг</span>{% endif %}
+      {% if mission.kind == "robust" %}<span class="kind-badge">🛠 почини тест</span>{% endif %}
+      {% if mission.static_check %}<span class="kind-badge">📐 проверка структуры</span>{% endif %}
+      {% if solved_at %}<span class="done-mark">✓ решено {{ solved_at | replace('T', ' ') }}</span>{% endif %}
+    </div>
+    <h1>{{ mission.title }}</h1>
+
+    <div class="prose">{{ brief }}</div>
+
+    {% if mission.skills %}
+    <div class="skills">
+      {% for s in mission.skills %}<code>{{ s }}</code>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not mission.autocheck and mission.kind == "normal" %}
+    <div class="note">
+      Песочница засчитывает только действие из задания — главное здесь твои <code>expect()</code>.
+      Насколько они хороши, покажет проверка ниже.
+    </div>
+    {% endif %}
+
+    <h3>Стартовый шаблон</h3>
+    <div class="code-wrap">
+      <button class="copy" type="button">Копировать</button>
+      <pre><code>{{ starter }}</code></pre>
+    </div>
+
+    {% if mission.verifiable %}
+    <div class="mutants" id="verify-box" data-slug="{{ mission.slug }}">
+      {% if mission.kind == "bug" %}
+      <h3>🔍 Проверка: баг найден?</h3>
+      <p>Тест должен <b>упасть</b> на текущей странице и <b>пройти</b> на исправленной версии — так понятно, что он ловит
+        именно этот баг, а не падает по другой причине. Миссия засчитывается только этой проверкой.</p>
+      {% elif mission.kind == "robust" %}
+      <h3>🛠 Проверка: тест пережил редизайн?</h3>
+      <p>Тест прогоняется на {{ mission.mutants | length }} «переделанных» версиях страницы и должен <b>пройти</b> на каждой.
+        Миссия засчитывается только этой проверкой.</p>
+      {% elif mission.mutants %}
+      <h3>🧬 Проверка мутантами</h3>
+      <p>Зелёный тест ещё не значит, что он что-то проверяет. Тест прогоняется на {{ mission.mutants | length }}
+        «сломанных» версиях страницы и должен <b>упасть</b> на каждой.</p>
+      {% else %}
+      <h3>📐 Проверка структуры</h3>
+      <p>Тест должен пройти, а его код — соответствовать заданию (проверяется разбором исходника).</p>
+      {% endif %}
+      {% if mission.static_check and mission.mutants %}<p class="muted">Дополнительно проверяется структура кода теста.</p>{% endif %}
+
+      <p>Тест ищется в <code>exercises/</code> по имени функции <code>{{ mission.func_name }}</code>.
+        Запусти проверку здесь или в терминале: <code>python verify.py {{ mission.slug }}</code></p>
+      <div class="row-gap">
+        <button class="btn-primary" type="button" id="verify-run">Запустить проверку</button>
+        <span class="muted" id="verify-state"></span>
+      </div>
+      <div id="verify-result">
+        {% if verification %}
+        <p class="{{ 'done-mark' if verification.ok else 'warn-mark' }}">
+          Последняя проверка ({{ verification.at | replace('T', ' ') }}):
+          {% if not verification.baseline %}тест не прошёл на исходной версии
+          {% elif verification.ok %}всё пройдено ✅
+          {% else %}есть замечания{% endif %}
+          {% if verification.total %} — {{ verification.passed }} из {{ verification.total }}{% endif %}
+        </p>
+        {% for note in verification.notes %}<p class="warn-mark">Структура: {{ note }}</p>{% endfor %}
+        {% endif %}
+      </div>
+      {% if mission.mutants and mission.kind != "bug" %}
+      <details>
+        <summary>{{ "Какие баги подсовываются" if mission.kind == "normal" else "Какие редизайны проверяются" }}</summary>
+        <ul>
+          {% for name, description in mission.mutants %}
+          <li>{% if verification and verification.baseline %}{% if name in verification.failed %}<b class="warn-mark">✘</b>{% else %}<span class="done-mark">✔</span>{% endif %} {% endif %}{{ description }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if hint %}
+    <details class="spoiler">
+      <summary>💡 Подсказка</summary>
+      <div class="prose">{{ hint }}</div>
+    </details>
+    {% endif %}
+
+    {% if solution %}
+    <details class="spoiler">
+      <summary>🔑 Эталонное решение</summary>
+      <div class="code-wrap">
+        <button class="copy" type="button">Копировать</button>
+        <pre><code>{{ solution }}</code></pre>
+      </div>
+    </details>
+    {% endif %}
+
+    {% if user_solution and solution %}
+    <details class="spoiler">
+      <summary>⚖️ Сравнить своё решение с эталоном</summary>
+      <div class="compare">
+        <div><div class="compare-title">Твоё решение (exercises/)</div><pre><code>{{ user_solution }}</code></pre></div>
+        <div><div class="compare-title">Эталон</div><pre><code>{{ solution }}</code></pre></div>
+      </div>
+    </details>
+    {% endif %}
+
+    {% for track, pos, next_in_track in in_tracks %}
+    {% if next_in_track %}
+    <p class="track-next">Трек «{{ track.title }}»: дальше —
+      <a href="{{ url_for('mission_page', slug=next_in_track.slug) }}">{{ next_in_track.title }} →</a></p>
+    {% endif %}
+    {% endfor %}
+
+    <nav class="pager">
+      {% if prev %}<a href="{{ url_for('mission_page', slug=prev.slug) }}">← {{ prev.title }}</a>{% else %}<span></span>{% endif %}
+      {% if next %}<a href="{{ url_for('mission_page', slug=next.slug) }}">{{ next.title }} →</a>{% endif %}
+    </nav>
+  </section>
+
+  <section class="mission-preview">
+    <div class="preview-bar">
+      <span class="url">/play/{{ mission.slug }}</span>
+      <span>
+        <button class="btn-ghost" id="reload-preview" type="button">↻</button>
+        <a class="btn-ghost" href="{{ url_for('playground', slug=mission.slug) }}" target="_blank">Открыть отдельно ↗</a>
+      </span>
+    </div>
+    <iframe id="preview" src="{{ url_for('playground', slug=mission.slug) }}" title="Песочница"></iframe>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.copy').forEach(btn => btn.addEventListener('click', async () => {
+    const text = btn.parentElement.querySelector('code').innerText;
+    try { await navigator.clipboard.writeText(text); btn.textContent = 'Скопировано'; }
+    catch { btn.textContent = 'Не удалось'; }
+    setTimeout(() => (btn.textContent = 'Копировать'), 1500);
+  }));
+  document.getElementById('reload-preview').addEventListener('click', () => {
+    const f = document.getElementById('preview');
+    f.src = f.src;
+  });
+
+  const box = document.getElementById('verify-box');
+  if (box) {
+    const slug = box.dataset.slug;
+    const runBtn = document.getElementById('verify-run');
+    const stateEl = document.getElementById('verify-state');
+    const resultEl = document.getElementById('verify-result');
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    const MARKS = {
+      normal: ok => ok ? '✔ убит' : '✘ выжил',
+      robust: ok => ok ? '✔ прошёл' : '✘ упал',
+      bug: ok => ok ? '✔ тест падает на версии с багом' : '✘ тест не падает на версии с багом',
+    };
+    function render(report) {
+      if (report.error) { resultEl.innerHTML = `<pre>${esc(report.error)}</pre>`; return; }
+      const lines = [];
+      if (!report.baseline) {
+        lines.push(`<p class="warn-mark">✘ ${report.kind === 'bug'
+          ? 'тест не проходит на исправленной версии — он проверяет что-то не то'
+          : 'тест не проходит на исходной версии страницы'}</p>`);
+      }
+      report.items.forEach(i => lines.push(`<p class="${i.ok ? 'done-mark' : 'warn-mark'}">${MARKS[report.kind](i.ok)}: ${esc(i.description)}${i.status === 'error' ? ' (ошибка запуска)' : ''}</p>`));
+      report.notes.forEach(n => lines.push(`<p class="warn-mark">✘ структура: ${esc(n)}</p>`));
+      lines.push(`<p><b>${report.ok ? '✅ Проверка пройдена — миссия засчитана' : '❌ Есть замечания'}</b></p>`);
+      resultEl.innerHTML = lines.join('');
+    }
+    async function poll() {
+      const job = await (await fetch(`/api/verify/${slug}`)).json();
+      if (job.state === 'running') {
+        stateEl.textContent = `Идёт проверка… ${Math.round(Date.now() / 1000 - job.started)} с`;
+        return setTimeout(poll, 1000);
+      }
+      runBtn.disabled = false;
+      stateEl.textContent = '';
+      if (job.state === 'done') {
+        const report = Array.isArray(job.result) ? job.result[0] : job.result;
+        render(report);
+      }
+    }
+    runBtn.addEventListener('click', async () => {
+      runBtn.disabled = true;
+      stateEl.textContent = 'Запускаю…';
+      const r = await fetch(`/api/verify/${slug}`, { method: 'POST' });
+      if (!r.ok) { stateEl.textContent = (await r.json()).error; runBtn.disabled = false; return; }
+      poll();
+    });
+    fetch(`/api/verify/${slug}`).then(r => r.json()).then(job => { if (job.state === 'running') { runBtn.disabled = true; poll(); } });
+  }
+</script>
+{% endblock %}

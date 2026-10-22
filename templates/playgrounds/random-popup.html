@@ -1,0 +1,56 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Пройди три шага: нажми по очереди «Шаг 1», «Шаг 2», «Шаг 3». Каждая следующая кнопка включается через полсекунды
+  после предыдущей.</p>
+<p>Подвох: маркетологи добавили баннер «Специальное предложение», который <b>иногда</b> (примерно в 2 случаях из 3)
+  выскакивает в случайный момент и перекрывает страницу. Закрыть его можно кнопкой «Не сейчас».
+  Тест должен проходить <b>всегда</b> — и с баннером, и без.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Для «непредсказуемых» оверлеев в Playwright есть <code>add_locator_handler</code>: перед каждым действием
+  Playwright проверяет, не появился ли указанный элемент, и если да — вызывает твой обработчик.</p>
+<pre><code>page.add_locator_handler(
+    page.get_by_role("dialog", name="Специальное предложение"),
+    lambda: page.get_by_role("button", name="Не сейчас").click(),
+)</code></pre>
+<p>Только не пытайся проверять баннер через <code>if banner.is_visible()</code> — он может появиться через миллисекунду после проверки.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Онбординг</h3>
+  <div class="row">
+    <button id="s1" class="primary">Шаг 1</button>
+    <button id="s2" disabled>Шаг 2</button>
+    <button id="s3" disabled>Шаг 3</button>
+  </div>
+  <p class="muted" id="log">Начни с первого шага</p>
+</div>
+<div class="overlay hidden" id="promo">
+  <div class="modal stack" role="dialog" aria-label="Специальное предложение">
+    <h3>🔥 Специальное предложение</h3>
+    <p>Скидка 50% на курс по автоматизации!</p>
+    <div class="row"><button id="no">Не сейчас</button><button class="primary" id="yes">Хочу скидку</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const promo = document.getElementById('promo');
+  if (Math.random() < 0.66) setTimeout(() => promo.classList.remove('hidden'), Lab.rand(200, 1800));
+  document.getElementById('no').addEventListener('click', () => promo.classList.add('hidden'));
+  document.getElementById('yes').addEventListener('click', () => { promo.classList.add('hidden'); Lab.fail('Тест подписался на рассылку 🙃'); });
+  const step = (n) => document.getElementById('s' + n);
+  [1, 2, 3].forEach(n => step(n).addEventListener('click', async () => {
+    step(n).disabled = true;
+    document.getElementById('log').textContent = `Шаг ${n} пройден`;
+    if (n === 3) return Lab.success('Онбординг пройден');
+    await Lab.sleep(500);
+    step(n + 1).disabled = false;
+    step(n + 1).classList.add('primary');
+  }));
+</script>
+{% endblock %}

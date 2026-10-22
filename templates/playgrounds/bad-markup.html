@@ -1,0 +1,44 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Форма оплаты, свёрстанная «как получилось»: подписи — просто <code>&lt;span&gt;</code> рядом с полем, без
+  <code>&lt;label&gt;</code>, <code>for</code>, placeholder и test-id. <code>get_by_label</code> тут бессилен.</p>
+<p>Заполни: «Номер карты» — <code>4242 4242 4242 4242</code>, «Срок действия» — <code>12/30</code>,
+  «CVC» — <code>123</code>, «Имя на карте» — <code>IVAN PETROV</code>, и нажми «Оплатить».</p>
+<p>Порядок строк формы случайный.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Найди «строку» формы по тексту подписи и возьми поле внутри неё:</p>
+<pre><code>def field(name):
+    return page.locator(".form-row").filter(has=page.get_by_text(name, exact=True)).locator("input")</code></pre>
+<p>Или XPath от подписи к соседу: <code>//span[text()='CVC']/following-sibling::input</code>.
+  Осторожно: подстрока «Имя» есть и в «Имя на карте», и в «Имя плательщика» — нужно точное совпадение.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 440px" id="form">
+  <h3>Оплата картой</h3>
+  <div id="rows"></div>
+  <button class="primary" id="pay">Оплатить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const fields = ['Номер карты', 'Срок действия', 'CVC', 'Имя на карте', 'Имя плательщика'];
+  fields.sort(() => Math.random() - .5).forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'form-row';
+    row.style.margin = '0 0 12px';
+    row.innerHTML = `<span class="muted" style="display:block; font-size:13px">${name}</span><input data-k="${name}">`;
+    document.getElementById('rows').appendChild(row);
+  });
+  const expected = { 'Номер карты': '4242 4242 4242 4242', 'Срок действия': '12/30', 'CVC': '123', 'Имя на карте': 'IVAN PETROV', 'Имя плательщика': '' };
+  document.getElementById('pay').addEventListener('click', () => {
+    const wrong = Object.entries(expected).filter(([k, v]) => document.querySelector(`[data-k="${k}"]`).value.trim() !== v).map(([k]) => k);
+    if (wrong.length) Lab.fail('неверно заполнено: ' + wrong.join(', '));
+    else Lab.success('Оплата прошла');
+  });
+</script>
+{% endblock %}

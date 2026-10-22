@@ -1,0 +1,54 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Форма отзыва отправляет <code>POST /api/feedback</code> и показывает только «Спасибо!». Убедись, что на сервер
+  ушло именно то, что нужно.</p>
+<ol>
+  <li>Выбери оценку <b>5</b>, напиши комментарий <code>Отлично</code>, нажми «Отправить».</li>
+  <li>Перехвати запрос и проверь: метод <code>POST</code>, тело — JSON
+    <code>{"rating": 5, "comment": "Отлично", "source": "lab"}</code> (оценка — число!).</li>
+  <li>Проверь, что на странице появилось «Спасибо!».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>with page.expect_request("**/api/feedback") as request_info:
+    page.get_by_role("button", name="Отправить").click()
+request = request_info.value
+assert request.method == "POST"
+assert request.post_data_json == {...}</code></pre>
+<p>Здесь используется обычный <code>assert</code>: запрос уже пойман, ждать нечего. Сравнивай весь словарь целиком —
+  тогда лишнее или пропавшее поле тоже уронит тест.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" style="max-width: 400px" id="form">
+  <div class="field"><label for="rating">Оценка</label>
+    <select id="rating"><option value="">—</option>{% for i in range(1, 6) %}<option>{{ i }}</option>{% endfor %}</select>
+  </div>
+  <div class="field"><label for="comment">Комментарий</label><textarea id="comment" rows="3" style="width:100%"></textarea></div>
+  <button class="primary" type="submit">Отправить</button>
+  <p class="ok hidden" id="thanks">Спасибо!</p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const rating = document.getElementById('rating').value;
+    const comment = document.getElementById('comment').value.trim();
+    if (!rating) return;
+    const body = { rating: Lab.mutant === 'rating-string' ? rating : Number(rating), comment, source: 'lab' };
+    if (Lab.mutant === 'no-source') delete body.source;
+    await fetch('/api/feedback', {
+      method: Lab.mutant === 'wrong-method' ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+    document.getElementById('thanks').classList.remove('hidden');
+    if (rating === '5' && comment === 'Отлично') Lab.success('Отзыв отправлен — проверь запрос');
+    else Lab.fail('отправлены не те оценка или комментарий');
+  });
+</script>
+{% endblock %}

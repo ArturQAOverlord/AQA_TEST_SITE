@@ -1,0 +1,61 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Панель проекта вызывает <b>нативные</b> диалоги браузера. Сделай по порядку:</p>
+<ol>
+  <li>«Удалить черновики» показывает <code>confirm()</code> — <b>подтверди</b>.</li>
+  <li>«Удалить проект» тоже показывает <code>confirm()</code> — <b>откажись</b>.</li>
+  <li>«Переименовать» показывает <code>prompt()</code> — введи <code>Lab 2.0</code>.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>По умолчанию Playwright <b>автоматически отклоняет</b> все диалоги. Чтобы ответить по-своему, подпишись на
+  событие <b>до</b> клика:</p>
+<pre><code>page.once("dialog", lambda dialog: dialog.accept())
+page.get_by_role("button", name="Удалить черновики").click()
+
+page.once("dialog", lambda dialog: dialog.accept("Lab 2.0"))</code></pre>
+<p><code>page.once</code> срабатывает один раз, <code>page.on</code> — на все диалоги. У <code>dialog</code> есть
+  <code>.message</code> и <code>.type</code> — их удобно проверять.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Проект: <span id="name">Lab</span></h3>
+  <div class="row">
+    <button id="drafts">Удалить черновики</button>
+    <button id="project" class="danger">Удалить проект</button>
+    <button id="rename">Переименовать</button>
+  </div>
+  <ul class="plain muted" id="log"></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const state = { drafts: null, project: null, name: null };
+  const log = t => { const li = document.createElement('li'); li.textContent = t; document.getElementById('log').appendChild(li); };
+  function check() {
+    if (state.drafts === true && state.project === false && state.name === 'Lab 2.0') Lab.success('Все диалоги обработаны верно');
+  }
+  document.getElementById('drafts').addEventListener('click', () => {
+    state.drafts = confirm('Удалить все черновики?');
+    log(state.drafts ? 'Черновики удалены' : 'Удаление черновиков отменено');
+    if (!state.drafts) Lab.fail('Черновики нужно было удалить');
+    check();
+  });
+  document.getElementById('project').addEventListener('click', () => {
+    state.project = confirm('Точно удалить проект целиком?');
+    log(state.project ? 'Проект удалён 💥' : 'Проект сохранён');
+    if (state.project) Lab.fail('Проект удалять было нельзя!');
+    check();
+  });
+  document.getElementById('rename').addEventListener('click', () => {
+    const v = prompt('Новое имя проекта', 'Lab');
+    if (v !== null) { state.name = v; document.getElementById('name').textContent = v; log('Новое имя: ' + v); }
+    if (v !== 'Lab 2.0') Lab.fail('Имя должно быть Lab 2.0');
+    check();
+  });
+</script>
+{% endblock %}

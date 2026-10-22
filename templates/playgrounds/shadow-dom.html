@@ -1,0 +1,47 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Карточка профиля сделана веб-компонентом <code>&lt;profile-card&gt;</code> с <b>open Shadow DOM</b>.
+  В DevTools её содержимое лежит под <code>#shadow-root</code>.</p>
+<p>Введи никнейм <code>neo</code> в поле «Никнейм» и нажми «Сохранить».</p>
+{% endblock %}
+
+{% block hint %}
+<p>Хорошая новость: CSS- и role-локаторы Playwright сами проходят сквозь open shadow root. Пиши так, будто Shadow DOM нет:
+  <code>page.get_by_label("Никнейм")</code>.</p>
+<p>А вот XPath сквозь shadow root <b>не</b> проходит — попробуй ради интереса <code>page.locator("//input")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Профиль</h2>
+<profile-card></profile-card>
+<p id="saved" class="muted"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  customElements.define('profile-card', class extends HTMLElement {
+    connectedCallback() {
+      const root = this.attachShadow({ mode: 'open' });
+      root.innerHTML = `
+        <style>
+          .box { background:#fff; border:1px solid #dde2ec; border-radius:12px; padding:18px; max-width:360px; }
+          input { font:inherit; padding:8px 10px; border:1px solid #c9d1e0; border-radius:8px; width:100%; box-sizing:border-box; }
+          button { font:inherit; margin-top:12px; padding:8px 16px; border-radius:8px; border:0; background:#2d6cdf; color:#fff; cursor:pointer; }
+          label { font-size:13px; color:#59617a; }
+        </style>
+        <div class="box">
+          <label for="nick">Никнейм</label>
+          <input id="nick">
+          <button>Сохранить</button>
+        </div>`;
+      root.querySelector('button').addEventListener('click', () => {
+        const nick = root.querySelector('#nick').value.trim();
+        document.getElementById('saved').textContent = 'Сохранён никнейм: ' + nick;
+        if (nick === 'neo') Lab.success('Добро пожаловать в Матрицу');
+        else Lab.fail('Ожидался никнейм neo');
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Панель редактора с тремя кнопками: «Сохранить», «Сохранить как…» и «Сохранить черновик».
+  Нажми просто <b>«Сохранить»</b>.</p>
+<p><code>get_by_role("button", name="Сохранить")</code> найдёт все три: имя сравнивается по подстроке.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>exact=True</code> включает точное совпадение (с учётом регистра, пробелы по краям обрезаются).
+  Ещё вариант — регулярка: <code>name=re.compile(r"^Сохранить$")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <textarea rows="5" style="width: 100%">Текст документа…</textarea>
+  <div class="row" id="buttons"></div>
+  <p id="log" class="muted"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  ['Сохранить черновик', 'Сохранить как…', 'Сохранить'].sort(() => Math.random() - .5).forEach(name => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.addEventListener('click', () => {
+      document.getElementById('log').textContent = 'Нажато: ' + name;
+      if (name === 'Сохранить') Lab.success('Документ сохранён');
+      else Lab.fail('Нажата кнопка «' + name + '»');
+    });
+    document.getElementById('buttons').appendChild(b);
+  });
+</script>
+{% endblock %}

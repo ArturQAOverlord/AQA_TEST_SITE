@@ -1,0 +1,44 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>На странице товара слово <b>«Избранное»</b> встречается трижды: ссылка в меню, заголовок блока и кнопка
+  рядом с товаром. Добавь товар в избранное — нажми <b>кнопку</b>.</p>
+<p><code>page.get_by_text("Избранное")</code> здесь не поможет.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Одинаковый текст — разные роли: <code>link</code>, <code>heading</code>, <code>button</code>.
+  Роль сама по себе отличный «фильтр».</p>
+{% endblock %}
+
+{% block content %}
+<nav class="row" style="margin-bottom: 16px">
+  <a href="#" id="nav-link">Каталог</a>
+  <a href="#" id="fav-link">Избранное</a>
+  <a href="#">Профиль</a>
+</nav>
+<div class="row" style="align-items: flex-start">
+  <div class="panel stack" style="flex: 2">
+    <h2>Наушники Lab Pro</h2>
+    <p class="muted">12 990 ₽</p>
+    <div class="row">
+      <button class="primary">Купить</button>
+      <button id="fav-btn">Избранное</button>
+    </div>
+  </div>
+  <aside class="panel" style="flex: 1">
+    <h3>Избранное</h3>
+    <ul class="plain" id="favs"><li class="muted">Пока пусто</li></ul>
+  </aside>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('fav-link').addEventListener('click', e => { e.preventDefault(); Lab.fail('Это ссылка в меню, а не кнопка'); });
+  document.getElementById('fav-btn').addEventListener('click', () => {
+    document.getElementById('favs').innerHTML = '<li>Наушники Lab Pro</li>';
+    Lab.success('Товар в избранном');
+  });
+</script>
+{% endblock %}

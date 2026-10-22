@@ -1,0 +1,10 @@
+<p>Действия Playwright имитируют настоящего пользователя: <code>click()</code> двигает мышь и нажимает кнопку, <code>press()</code> шлёт
+  событие клавиатуры. Такие события «доверенные» (<code>isTrusted</code>) — в отличие от <code>dispatch_event()</code> и
+  <code>el.click()</code> из JS, которые многие приложения просто игнорируют.</p>
+<ul>
+  <li><code>fill()</code> очищает поле и вставляет текст целиком (одно событие <code>input</code>);
+    <code>press_sequentially()</code> печатает по одной клавише — нужно для автокомплитов и масок.</li>
+  <li><code>check()</code>/<code>uncheck()</code> приводят чекбокс к состоянию, <code>click()</code> — переключает.</li>
+  <li>Нативные <code>alert/confirm/prompt</code> по умолчанию отклоняются — подпишись на <code>page.on("dialog")</code> до действия.</li>
+  <li>События, которые ещё только произойдут (файл, вкладка, скачивание), ловят через <code>with page.expect_…() as info:</code>.</li>
+</ul>

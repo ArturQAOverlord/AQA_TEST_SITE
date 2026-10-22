@@ -1,0 +1,99 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Справочник контактов. Выполни все операции и сохрани результат:</p>
+<ol>
+  <li><b>Создай</b> контакт: «Добавить» → имя <code>Глеб</code>, телефон <code>+7 999 000-00-04</code> → «Сохранить».</li>
+  <li><b>Измени</b> телефон Бориса на <code>+7 999 111-11-11</code> (кнопка «Изменить» в его строке).</li>
+  <li><b>Удали</b> Веру: «Удалить» в её строке и подтверди нативный <code>confirm()</code>.</li>
+  <li>Проверь таблицу: остались ровно Алиса, Борис и Глеб (в таком порядке), у Бориса новый телефон.</li>
+  <li>Нажми «Сохранить изменения».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Удобно завести хелпер «строка по имени»:</p>
+<pre><code>def row(name):
+    return page.get_by_role("row").filter(has=page.get_by_role("cell", name=name, exact=True))</code></pre>
+<p>Форма открывается в диалоге — ищи поля внутри <code>page.get_by_role("dialog")</code>. Для удаления подпишись
+  на <code>dialog</code> до клика. Итог удобно проверить одним
+  <code>expect(page.get_by_test_id("contact-name")).to_have_text([...])</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <div class="row" style="justify-content: space-between">
+    <h3 style="margin:0">Контакты</h3>
+    <button id="add">Добавить</button>
+  </div>
+  <table>
+    <thead><tr><th>Имя</th><th>Телефон</th><th></th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <button class="primary" id="commit">Сохранить изменения</button>
+</div>
+<div class="overlay hidden" id="ov">
+  <form class="modal stack" role="dialog" aria-labelledby="dlg-title" id="dlg">
+    <h3 id="dlg-title"></h3>
+    <div class="field"><label for="f-name">Имя</label><input id="f-name"></div>
+    <div class="field"><label for="f-phone">Телефон</label><input id="f-phone"></div>
+    <div class="row"><button type="button" id="cancel">Отмена</button><button class="primary" type="submit">Сохранить</button></div>
+  </form>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let contacts = [
+    { id: 1, name: 'Алиса', phone: '+7 999 000-00-01' },
+    { id: 2, name: 'Борис', phone: '+7 999 000-00-02' },
+    { id: 3, name: 'Вера', phone: '+7 999 000-00-03' },
+  ];
+  const shownPhone = {};
+  let editing = null, nextId = 4;
+  const ov = document.getElementById('ov');
+  function render() {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+    contacts.forEach(c => {
+      if (!(c.id in shownPhone) || Lab.mutant !== 'edit-not-shown') shownPhone[c.id] = c.phone;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td data-testid="contact-name">${c.name}</td><td data-testid="contact-phone">${shownPhone[c.id]}</td>
+        <td><button data-act="edit">Изменить</button> <button data-act="del" class="danger">Удалить</button></td>`;
+      tr.querySelector('[data-act=edit]').addEventListener('click', () => openForm(c));
+      tr.querySelector('[data-act=del]').addEventListener('click', () => {
+        if (!confirm(`Удалить контакт ${c.name}?`)) return;
+        contacts = contacts.filter(x => x !== c);
+        render();
+      });
+      tbody.appendChild(tr);
+    });
+  }
+  function openForm(c) {
+    editing = c;
+    document.getElementById('dlg-title').textContent = c ? 'Редактирование' : 'Новый контакт';
+    document.getElementById('f-name').value = c ? c.name : '';
+    document.getElementById('f-phone').value = c ? c.phone : '';
+    ov.classList.remove('hidden');
+  }
+  document.getElementById('add').addEventListener('click', () => openForm(null));
+  document.getElementById('cancel').addEventListener('click', () => ov.classList.add('hidden'));
+  document.getElementById('dlg').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = document.getElementById('f-name').value.trim();
+    const phone = document.getElementById('f-phone').value.trim();
+    if (!name || !phone) return;
+    if (editing) Object.assign(editing, { name, phone });
+    else contacts.push({ id: nextId++, name, phone });
+    ov.classList.add('hidden');
+    render();
+  });
+  document.getElementById('commit').addEventListener('click', () => {
+    const state = contacts.map(c => `${c.name}|${c.phone}`).join(';');
+    const want = 'Алиса|+7 999 000-00-01;Борис|+7 999 111-11-11;Глеб|+7 999 000-00-04';
+    if (state === want) Lab.success('Справочник сохранён');
+    else Lab.fail('итоговые данные не совпадают с заданием');
+  });
+  render();
+</script>
+{% endblock %}

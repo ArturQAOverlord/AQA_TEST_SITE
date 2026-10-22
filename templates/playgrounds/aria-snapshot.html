@@ -1,0 +1,50 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Вместо пяти отдельных проверок меню можно проверить всю его структуру одним ARIA-снимком
+  (<code>to_match_aria_snapshot</code>, Playwright 1.49+).</p>
+<ol>
+  <li>Нажми «Войти» в меню.</li>
+  <li>Проверь снимком, что навигация «Основное меню» теперь содержит по порядку: ссылки «Главная», «Курсы», «Блог»,
+    «Профиль» и кнопку «Выйти».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Снимок проще всего получить, а не писать руками: <code>print(nav.aria_snapshot())</code> — и вставить в тест.
+  Либо открой <code>playwright codegen</code> и выбери «Assert snapshot».</p>
+<pre><code>expect(page.get_by_role("navigation", name="Основное меню")).to_match_aria_snapshot("""
+  - list:
+    - listitem:
+      - link "Главная"
+    ...
+""")</code></pre>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="Основное меню" class="panel">
+  <ul class="plain row" id="menu"></ul>
+</nav>
+<p class="muted" id="who" style="margin-top: 16px">Вы не вошли</p>
+{% endblock %}
+
+{% block script %}
+<script>
+  let logged = false;
+  function render() {
+    const items = ['<a href="#">Главная</a>', '<a href="#">Курсы</a>', '<a href="#">Блог</a>'];
+    if (logged) {
+      if (Lab.mutant !== 'missing-item') items.push('<a href="#">Профиль</a>');
+      items.push(`<button id="auth">${Lab.mutant === 'renamed' ? 'Выход' : 'Выйти'}</button>`);
+    } else items.push('<button id="auth" class="primary">Войти</button>');
+    document.getElementById('menu').innerHTML = items.map(i => `<li>${i}</li>`).join('');
+    document.getElementById('auth').addEventListener('click', () => {
+      logged = !logged;
+      document.getElementById('who').textContent = logged ? 'Вы вошли как student' : 'Вы не вошли';
+      render();
+      if (logged) Lab.success('Вход выполнен — проверь снимок меню');
+    });
+  }
+  render();
+</script>
+{% endblock %}

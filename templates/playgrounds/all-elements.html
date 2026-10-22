@@ -1,0 +1,48 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Чек-лист релиза. Количество пунктов каждый раз разное (от 4 до 8), часть из них уже может быть отмечена.
+  Отметь <b>все</b> пункты и нажми «Выпустить релиз».</p>
+<p>Кнопки «Отметить всё» нет — придётся пройтись по элементам.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Локатор, указывающий на много элементов, нельзя кликнуть целиком (strict mode), но можно:</p>
+<ul>
+  <li>узнать количество — <code>locator.count()</code>;</li>
+  <li>получить список локаторов — <code>locator.all()</code> и пройтись по нему циклом;</li>
+  <li>проверить сразу всё — <code>expect(locator).to_have_count(n)</code>.</li>
+</ul>
+<p><code>check()</code> на уже отмеченном чекбоксе ничего не сломает, а вот <code>click()</code> снимет отметку.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Перед релизом</h3>
+  <ul class="plain" id="list"></ul>
+  <p class="muted" id="counter"></p>
+  <button class="primary" id="release">Выпустить релиз</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const items = ['Тесты зелёные', 'Changelog обновлён', 'Миграции проверены', 'Версия поднята',
+                 'Документация обновлена', 'Мониторинг настроен', 'Бэкап сделан', 'Команда предупреждена'];
+  const n = Lab.rand(4, 8);
+  const list = document.getElementById('list');
+  items.slice(0, n).forEach(t => {
+    const li = document.createElement('li');
+    li.innerHTML = `<label class="inline"><input type="checkbox" ${Math.random() < .3 ? 'checked' : ''}> ${t}</label>`;
+    list.appendChild(li);
+  });
+  const boxes = () => [...list.querySelectorAll('input')];
+  const update = () => document.getElementById('counter').textContent = `Отмечено ${boxes().filter(b => b.checked).length} из ${n}`;
+  list.addEventListener('change', update);
+  update();
+  document.getElementById('release').addEventListener('click', () => {
+    if (boxes().every(b => b.checked)) Lab.success('Релиз выпущен 🚀');
+    else Lab.fail('Не все пункты отмечены');
+  });
+</script>
+{% endblock %}

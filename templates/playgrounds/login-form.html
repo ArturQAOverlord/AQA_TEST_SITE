@@ -1,0 +1,43 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Классика. Войди в систему:</p>
+<ul>
+  <li>Логин — <code>student</code></li>
+  <li>Пароль — <code>playwright123</code></li>
+  <li>Отметь «Запомнить меня»</li>
+  <li>Нажми «Войти»</li>
+</ul>
+{% endblock %}
+
+{% block hint %}
+<p><code>fill()</code> очищает поле и вставляет текст целиком. Для чекбокса — <code>check()</code>,
+  он идемпотентен: если чекбокс уже отмечен, ничего не произойдёт.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="login" style="max-width: 360px">
+  <h2>Вход</h2>
+  <div class="field"><label for="u">Логин</label><input id="u" autocomplete="off"></div>
+  <div class="field"><label for="p">Пароль</label><input id="p" type="password"></div>
+  <div class="field"><label class="inline"><input type="checkbox" id="remember"> Запомнить меня</label></div>
+  <button class="primary" type="submit">Войти</button>
+  <p class="error" id="err"></p>
+</form>
+<div class="panel hidden" id="welcome"><h2>Привет, student!</h2></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('login').addEventListener('submit', e => {
+    e.preventDefault();
+    const ok = document.getElementById('u').value === 'student' && document.getElementById('p').value === 'playwright123';
+    const remember = document.getElementById('remember').checked;
+    if (!ok) { document.getElementById('err').textContent = 'Неверный логин или пароль'; return Lab.fail('Неверные данные'); }
+    if (!remember) return Lab.fail('Забыли «Запомнить меня»');
+    e.target.classList.add('hidden');
+    document.getElementById('welcome').classList.remove('hidden');
+    Lab.success('Вход выполнен');
+  });
+</script>
+{% endblock %}

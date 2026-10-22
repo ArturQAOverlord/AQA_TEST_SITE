@@ -1,0 +1,42 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p><b>Спецификация:</b> клик по заголовку «Цена» сортирует товары по цене <b>по возрастанию</b>, повторный клик — <b>по убыванию</b>.</p>
+<p>Напиши тест, который проверяет обе сортировки. На текущей версии он должен упасть, на исправленной — пройти.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Не захардкоживай ожидаемый порядок — вычисли его из данных на странице:</p>
+<pre><code>prices = page.get_by_test_id("price")
+values = [int(t.removesuffix(" ₽")) for t in prices.all_inner_texts()]
+page.get_by_role("button", name="Цена").click()
+expect(prices).to_have_text([f"{v} ₽" for v in sorted(values)])</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 460px">
+  <table>
+    <thead><tr><th>Товар</th><th><button id="sort" style="padding: 2px 8px">Цена</button> <span id="dir"></span></th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const items = [['Чехол', 990], ['Наушники', 12000], ['Кабель', 250], ['Зарядка', 1500], ['Колонка', 4500], ['Стилус', 3200]];
+  let dir = 0;
+  function render() {
+    document.getElementById('tbody').innerHTML = items.map(([n, p]) => `<tr><td>${n}</td><td data-testid="price">${p} ₽</td></tr>`).join('');
+    document.getElementById('dir').textContent = dir === 1 ? '↑' : dir === -1 ? '↓' : '';
+  }
+  document.getElementById('sort').addEventListener('click', () => {
+    dir = dir === 1 ? -1 : 1;
+    // БАГ: цены сравниваются как строки
+    const key = Lab.mutant === 'fixed' ? (x => x[1]) : (x => String(x[1]));
+    items.sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * dir);
+    render();
+  });
+  render();
+</script>
+{% endblock %}

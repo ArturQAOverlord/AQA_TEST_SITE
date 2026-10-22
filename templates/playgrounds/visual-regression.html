@@ -1,0 +1,69 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Дизайнеры часто «чуть-чуть» правят вёрстку графиков, и DOM-проверки этого не замечают. Нужен визуальный тест.</p>
+<ol>
+  <li>Нажми «Показать отчёт».</li>
+  <li>Сделай скриншот карточки графика (<code>data-testid="sales-chart"</code>): анимации отключены, время обновления замаскировано —
+    оно меняется каждую секунду.</li>
+  <li>Сравни скриншот с эталоном <code>__snapshots__/visual-regression.png</code> рядом с файлом теста.
+    Если эталона ещё нет — сохрани текущий скриншот как эталон.</li>
+</ol>
+<p>У Python-версии Playwright нет готового <code>to_have_screenshot</code>, поэтому сравнение пишется самому — например,
+  на Pillow (он уже в <code>requirements.txt</code>). Проверка мутантами покажет, замечает ли тест мелкие правки дизайна.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>image = chart.screenshot(animations="disabled", mask=[page.get_by_test_id("updated-at")])
+
+expected = Image.open(baseline).convert("RGB")
+actual = Image.open(io.BytesIO(image)).convert("RGB")
+diff = ImageChops.difference(expected, actual).convert("L").point(lambda v: 255 if v > 16 else 0)
+changed = diff.histogram()[255]   # сколько пикселей отличается заметно</code></pre>
+<p>Порог (здесь 16 из 255 по яркости и доля изменённых пикселей) нужен, чтобы не падать от сглаживания шрифтов.
+  Эталоны зависят от ОС и шрифтов — в CI их снимают в том же Docker-образе, где запускают тесты.</p>
+{% endblock %}
+
+{% block head %}
+<style>
+  .chart { display: flex; align-items: flex-end; gap: 14px; height: 180px; padding: 10px 0; border-bottom: 2px solid #dde2ec; }
+  .bar { width: 34px; background: #2d6cdf; border-radius: 6px 6px 0 0; }
+  .bar.odd { background: {{ "#d29922" if mutant == "bar-color" else "#2d6cdf" }}; }
+  .labels { display: flex; gap: 14px; font-size: 12px; color: #6b7385; }
+  .labels span { width: 34px; text-align: center; }
+  .live { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #1a7f37; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .2; transform: scale(1.6); } }
+  #chart-title { font-size: {{ "22px" if mutant == "title-size" else "20px" }}; margin: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<button class="primary" id="show">Показать отчёт</button>
+<div class="panel stack hidden" data-testid="sales-chart" id="card" style="max-width: 440px; margin-top: 16px">
+  <div class="row" style="justify-content: space-between">
+    <h3 id="chart-title">Продажи за неделю</h3>
+    <span><span class="live"></span> LIVE</span>
+  </div>
+  <span class="muted" data-testid="updated-at" id="updated"></span>
+  {% set heights = [120, 80, 150, 60, 170, 110, 90] %}
+  <div class="chart">
+    {% for h in heights %}
+    <div class="bar {{ 'odd' if loop.index == 4 else '' }}" style="height: {{ h - 6 if (mutant == 'bar-height' and loop.index == 3) else h }}px"></div>
+    {% endfor %}
+  </div>
+  <div class="labels">{% for d in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] %}<span>{{ d }}</span>{% endfor %}</div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const tick = () => document.getElementById('updated').textContent = 'Обновлено: ' + new Date().toLocaleTimeString('ru-RU');
+  tick();
+  setInterval(tick, 1000);
+  document.getElementById('show').addEventListener('click', e => {
+    e.target.classList.add('hidden');
+    document.getElementById('card').classList.remove('hidden');
+    Lab.success('Отчёт показан — сравни скриншот');
+  });
+</script>
+{% endblock %}

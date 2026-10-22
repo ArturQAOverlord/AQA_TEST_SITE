@@ -1,0 +1,40 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Каталог товаров. У каждой карточки одинаковая кнопка <b>«В корзину»</b>. Только у одного товара есть плашка
+  <b>«Скидка»</b> — добавь в корзину именно его.</p>
+<p>Название товара со скидкой меняется при каждой загрузке, так что захардкодить его не выйдет.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Карточки — элементы списка (<code>role="listitem"</code>). Сначала найди все карточки, потом оставь только ту,
+  в которой есть нужный текст, и уже внутри неё ищи кнопку:</p>
+<pre><code>page.get_by_role("listitem").filter(has_text="...").get_by_role("button", name="...")</code></pre>
+{% endblock %}
+
+{% block content %}
+<h2>Каталог</h2>
+<ul class="plain grid" id="products"></ul>
+<p id="cart" class="muted">Корзина пуста</p>
+{% endblock %}
+
+{% block script %}
+<script>
+  const names = ['Кофеварка', 'Чайник', 'Тостер', 'Блендер', 'Миксер', 'Соковыжималка'];
+  const sale = Lab.rand(0, names.length - 1);
+  const list = document.getElementById('products');
+  names.forEach((name, i) => {
+    const li = document.createElement('li');
+    li.className = 'card stack';
+    li.innerHTML = `<b>${name}</b><span class="muted">${Lab.rand(20, 90) * 100} ₽</span>`
+      + (i === sale ? '<span class="badge red">Скидка −20%</span>' : '<span class="badge">Новинка</span>')
+      + '<button>В корзину</button>';
+    li.querySelector('button').addEventListener('click', () => {
+      document.getElementById('cart').textContent = 'В корзине: ' + name;
+      if (i === sale) Lab.success(name + ' со скидкой в корзине');
+      else Lab.fail(name + ' — без скидки');
+    });
+    list.appendChild(li);
+  });
+</script>
+{% endblock %}

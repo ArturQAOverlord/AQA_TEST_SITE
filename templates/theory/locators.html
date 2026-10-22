@@ -1,0 +1,12 @@
+<p><b>Локатор</b> в Playwright — это не найденный элемент, а <i>описание того, как его найти</i>. Поиск выполняется заново
+  перед каждым действием, поэтому локаторы не «протухают» при перерисовке страницы.</p>
+<p>Порядок выбора, от лучшего к худшему:</p>
+<ol>
+  <li><code>get_by_role(role, name=…)</code> — так элемент видит пользователь и скринридер;</li>
+  <li><code>get_by_label</code>, <code>get_by_placeholder</code>, <code>get_by_text</code>, <code>get_by_alt_text</code>, <code>get_by_title</code>;</li>
+  <li><code>get_by_test_id</code> — договорённость с разработчиками, не зависит от текста;</li>
+  <li>CSS и XPath — только когда семантики нет.</li>
+</ol>
+<p>Сужай поиск цепочкой (<code>region.get_by_role(…)</code>) и фильтрами (<code>filter(has_text=…)</code>, <code>filter(has=…)</code>), а не
+  длинными CSS-путями. Помни: <code>name=</code> и <code>get_by_text</code> по умолчанию ищут <b>подстроку без учёта регистра</b>;
+  точное совпадение — <code>exact=True</code>.</p>

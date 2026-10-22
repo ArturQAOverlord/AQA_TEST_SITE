@@ -1,0 +1,47 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Фотобанк. Сделай два действия по порядку:</p>
+<ol>
+  <li>Кликни по фотографии с <code>alt="Море"</code> — она станет выбранной.</li>
+  <li>Нажми иконку-сердечко с подсказкой (атрибут <code>title</code>) <b>«Добавить в избранное»</b>.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p><code>page.get_by_alt_text("Море")</code> и <code>page.get_by_title("Добавить в избранное")</code>.
+  Рядом есть иконка «Добавить в коллекцию» — обрати внимание на <code>exact</code>, если понадобится.</p>
+{% endblock %}
+
+{% block content %}
+{% set img = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='100'><rect width='160' height='100' fill='%23COLOR'/></svg>" %}
+<div class="grid">
+  <div class="card stack"><img src="{{ img | replace('COLOR', '7aa874') }}" alt="Лес" data-photo="forest"><span class="muted">#1042</span></div>
+  <div class="card stack"><img src="{{ img | replace('COLOR', '4a90d9') }}" alt="Море" data-photo="sea"><span class="muted">#1043</span></div>
+  <div class="card stack"><img src="{{ img | replace('COLOR', 'a39a8f') }}" alt="Горы" data-photo="mountains"><span class="muted">#1044</span></div>
+</div>
+<div class="row" style="margin-top: 16px">
+  <span class="muted" id="selected">Фото не выбрано</span>
+  <span title="Добавить в коллекцию" id="collect" style="cursor:pointer; font-size: 22px">📁</span>
+  <span title="Добавить в избранное" id="fav" style="cursor:pointer; font-size: 22px">🤍</span>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let selected = null;
+  document.querySelectorAll('[data-photo]').forEach(img => img.addEventListener('click', () => {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+    img.parentElement.classList.add('selected');
+    selected = img.dataset.photo;
+    document.getElementById('selected').textContent = 'Выбрано фото: ' + img.alt;
+  }));
+  document.getElementById('collect').addEventListener('click', () => Lab.fail('Это коллекция, а не избранное'));
+  document.getElementById('fav').addEventListener('click', e => {
+    if (!selected) return Lab.fail('Сначала выбери фото');
+    e.target.textContent = '❤️';
+    if (selected === 'sea') Lab.success('Море в избранном');
+    else Lab.fail('В избранное ушло не то фото');
+  });
+</script>
+{% endblock %}

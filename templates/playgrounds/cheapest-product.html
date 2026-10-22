@@ -1,0 +1,43 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Восемь ноутбуков со случайными ценами. Купи <b>самый дешёвый</b> — нажми «Купить» в его карточке.</p>
+<p>Цены записаны с пробелами между разрядами (<code>54 990 ₽</code>), у части товаров есть старая зачёркнутая цена —
+  она не считается. Покупка не самого дешёвого — провал.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Пройдись по карточкам, достань текущую цену из элемента с <code>data-testid="price"</code> и переведи её в число:</p>
+<pre><code>cards = page.get_by_role("listitem")
+prices = [int(re.sub(r"\D", "", card.get_by_test_id("price").inner_text())) for card in cards.all()]
+cards.nth(prices.index(min(prices))).get_by_role("button", name="Купить").click()</code></pre>
+<p>Ещё короче: <code>page.get_by_test_id("price").all_inner_texts()</code>.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Ноутбуки</h2>
+<ul class="plain grid" id="list"></ul>
+{% endblock %}
+
+{% block script %}
+<script>
+  const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const names = ['Air 13', 'Pro 14', 'Book 15', 'Zen 14', 'Swift 3', 'Ideapad 5', 'Vivo 16', 'Aspire 7'];
+  const prices = new Set();
+  while (prices.size < names.length) prices.add(Lab.rand(35, 160) * 1000 - 10);
+  const list = [...prices];
+  const min = Math.min(...list);
+  names.forEach((name, i) => {
+    const price = list[i];
+    const li = document.createElement('li');
+    li.className = 'card stack';
+    const old = Math.random() < .5 ? `<s class="muted">${fmt(price - Lab.rand(5, 30) * 1000)} ₽</s>` : '';
+    li.innerHTML = `<b>${name}</b>${old}<span data-testid="price">${fmt(price)} ₽</span><button>Купить</button>`;
+    li.querySelector('button').addEventListener('click', () => {
+      if (price === min) Lab.success(`Куплен ${name} за ${fmt(price)} ₽`);
+      else Lab.fail(`${name} за ${fmt(price)} ₽ — не самый дешёвый`);
+    });
+    document.getElementById('list').appendChild(li);
+  });
+</script>
+{% endblock %}

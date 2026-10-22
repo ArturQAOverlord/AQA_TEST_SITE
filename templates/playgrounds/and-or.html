@@ -1,0 +1,49 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Две задачи на комбинирование локаторов.</p>
+<ol>
+  <li>Есть две кнопки «Подтвердить». Нажми ту, у которой подсказка (<code>title</code>) — <b>«Подтвердить оплату»</b>.
+    Порядок кнопок случайный.</li>
+  <li>На сайте идёт A/B-тест: в баннере cookies кнопка называется то «Принять cookies», то «Согласен».
+    Нажми её одним локатором, который работает в обоих вариантах.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p><code>a.and_(b)</code> — элемент, который подходит под оба локатора; <code>a.or_(b)</code> — под любой из них.</p>
+<pre><code>page.get_by_role("button", name="Подтвердить").and_(page.get_by_title("Подтвердить оплату"))
+page.get_by_role("button", name="Принять cookies").or_(page.get_by_role("button", name="Согласен"))</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 460px">
+  <h3>Заказ №7781</h3>
+  <div class="row" id="confirm-row"></div>
+  <p class="muted" id="log"></p>
+</div>
+<div class="card row" style="position: fixed; bottom: 60px; left: 24px; right: 24px; justify-content: space-between">
+  <span>Мы используем cookies, чтобы сайт работал лучше.</span>
+  <button class="primary" id="cookie-btn"></button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const done = new Set();
+  const finish = key => { done.add(key); if (done.size === 2) Lab.success('Оба локатора сработали'); };
+  [['Подтвердить оплату', 'pay'], ['Подтвердить удаление', 'delete']].sort(() => Math.random() - .5).forEach(([title, kind]) => {
+    const b = document.createElement('button');
+    b.textContent = 'Подтвердить';
+    b.title = title;
+    b.addEventListener('click', () => {
+      document.getElementById('log').textContent = 'Нажато: ' + title;
+      if (kind === 'pay') finish('pay'); else Lab.fail('подтверждено удаление вместо оплаты');
+    });
+    document.getElementById('confirm-row').appendChild(b);
+  });
+  const cookie = document.getElementById('cookie-btn');
+  cookie.textContent = Math.random() < .5 ? 'Принять cookies' : 'Согласен';
+  cookie.addEventListener('click', () => { cookie.closest('.card').remove(); finish('cookies'); });
+</script>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Файловый менеджер. Нужно:</p>
+<ol>
+  <li><b>Двойным кликом</b> открыть папку «Документы» — внутри появится файл <code>report.pdf</code>.</li>
+  <li><b>Правым кликом</b> по <code>report.pdf</code> вызвать контекстное меню и выбрать «Переименовать».</li>
+</ol>
+<p>Обычный одиночный клик по папке только выделяет её.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>locator.dblclick()</code> и <code>locator.click(button="right")</code>. Пункт меню — роль <code>menuitem</code>.</p>
+<p>Кстати, клик с модификатором тоже есть: <code>click(modifiers=["Shift"])</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="min-height: 260px; position: relative">
+  <div class="row">
+    <div class="card clickable" id="folder" style="width: 140px; text-align: center; user-select: none">📁<br>Документы</div>
+    <div class="card" style="width: 140px; text-align: center">📁<br>Загрузки</div>
+  </div>
+  <div id="files" class="hidden" style="margin-top: 16px">
+    <span class="card" id="file" style="display:inline-block; user-select:none">📄 report.pdf</span>
+  </div>
+  <ul id="menu" role="menu" class="plain card hidden" style="position:absolute; padding:6px; width:180px">
+    <li role="menuitem" style="padding:6px; cursor:pointer" data-cmd="open">Открыть</li>
+    <li role="menuitem" style="padding:6px; cursor:pointer" data-cmd="rename">Переименовать</li>
+    <li role="menuitem" style="padding:6px; cursor:pointer" data-cmd="delete">Удалить</li>
+  </ul>
+  <p id="log" class="muted"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const folder = document.getElementById('folder');
+  const menu = document.getElementById('menu');
+  const log = document.getElementById('log');
+  folder.addEventListener('click', () => folder.classList.add('selected'));
+  folder.addEventListener('dblclick', () => {
+    document.getElementById('files').classList.remove('hidden');
+    log.textContent = 'Папка «Документы» открыта';
+  });
+  document.getElementById('file').addEventListener('contextmenu', e => {
+    e.preventDefault();
+    menu.style.left = (e.offsetX + e.target.offsetLeft) + 'px';
+    menu.style.top = (e.offsetY + e.target.offsetTop) + 'px';
+    menu.classList.remove('hidden');
+  });
+  document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.classList.add('hidden'); });
+  menu.querySelectorAll('[data-cmd]').forEach(item => item.addEventListener('click', () => {
+    menu.classList.add('hidden');
+    log.textContent = 'Команда: ' + item.textContent;
+    if (item.dataset.cmd === 'rename') Lab.success('Файл готов к переименованию');
+    else Lab.fail('Выбрана команда «' + item.textContent + '»');
+  }));
+</script>
+{% endblock %}

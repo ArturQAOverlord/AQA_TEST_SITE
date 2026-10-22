@@ -1,0 +1,42 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Три тарифа, у всех одинаковая кнопка <b>«Выбрать»</b>. Выбери тариф <b>Pro</b>.</p>
+<p>Разработчики позаботились о тестировщиках и повесили на кнопки атрибут <code>data-testid</code>.
+  Загляни в DevTools, найди нужный и воспользуйся им.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>page.get_by_test_id("...")</code> по умолчанию ищет по атрибуту <code>data-testid</code>.
+  Если в проекте другой атрибут (например <code>data-qa</code>), его меняют через
+  <code>playwright.selectors.set_test_id_attribute("data-qa")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Тарифы</h2>
+<div class="grid">
+  <div class="card stack">
+    <h3>Basic</h3><p class="muted">0 ₽ / мес</p>
+    <button data-testid="plan-basic" data-plan="basic">Выбрать</button>
+  </div>
+  <div class="card stack">
+    <h3>Pro</h3><p class="muted">990 ₽ / мес</p>
+    <button data-testid="plan-pro" data-plan="pro" class="primary">Выбрать</button>
+  </div>
+  <div class="card stack">
+    <h3>Team</h3><p class="muted">2 990 ₽ / мес</p>
+    <button data-testid="plan-team" data-plan="team">Выбрать</button>
+  </div>
+</div>
+<p id="chosen" class="muted"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('[data-plan]').forEach(btn => btn.addEventListener('click', () => {
+    document.getElementById('chosen').textContent = 'Выбран тариф: ' + btn.dataset.plan;
+    if (btn.dataset.plan === 'pro') Lab.success('Тариф Pro выбран');
+    else Lab.fail('Выбран не тот тариф: ' + btn.dataset.plan);
+  }));
+</script>
+{% endblock %}

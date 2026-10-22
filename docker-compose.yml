@@ -1,0 +1,11 @@
+services:
+  lab:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      LAB_DATA_DIR: /lab/data
+    volumes:
+      # Твои решения и прогресс живут на хосте — решения можно править в любимой IDE
+      - ./exercises:/lab/exercises
+      - ./data:/lab/data

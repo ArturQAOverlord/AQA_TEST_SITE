@@ -1,0 +1,41 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Сайт сам подстраивается под системную тему (<code>prefers-color-scheme</code>). Кнопка
+  «Сообщить о баге тёмной темы» видна только в тёмной теме.</p>
+<p>Включи эмуляцию тёмной темы, проверь, что фон карточки стал <code>rgb(13, 17, 23)</code>, и нажми эту кнопку.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.emulate_media(color_scheme="dark")</code></pre>
+<p>Можно задать и для всего контекста: <code>browser.new_context(color_scheme="dark")</code>.
+  Тем же <code>emulate_media</code> включают <code>media="print"</code> и <code>reduced_motion="reduce"</code>.</p>
+{% endblock %}
+
+{% block head %}
+<style>
+  .themed { background: #ffffff; color: #1f2430; }
+  .dark-only { display: none; }
+  @media (prefers-color-scheme: dark) {
+    .themed { background: #0d1117; color: #e6edf3; }
+    .dark-only { display: inline-block; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack themed" data-testid="card" style="max-width: 420px">
+  <h3>Статья</h3>
+  <p>Текст, который должен хорошо читаться в любой теме.</p>
+  <button class="dark-only" id="report">Сообщить о баге тёмной темы</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('report').addEventListener('click', () => {
+    if (!matchMedia('(prefers-color-scheme: dark)').matches) return Lab.fail('тёмная тема не включена');
+    Lab.success('Баг тёмной темы отправлен');
+  });
+</script>
+{% endblock %}

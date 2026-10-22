@@ -1,0 +1,56 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Адаптивная шапка: на экранах уже <b>600 px</b> ссылки меню прячутся в бургер «Меню».</p>
+<p>Проверь мобильную версию: открой страницу с размером окна <b>375×667</b>, раскрой бургер и нажми «Контакты».
+  Клик по «Контактам» в десктопной версии не засчитывается.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.set_viewport_size({"width": 375, "height": 667})
+page.goto("/play/mobile-viewport")</code></pre>
+<p>Полноценная эмуляция устройства (user agent, touch, devicePixelRatio) — через
+  <code>browser.new_context(**playwright.devices["iPhone 13"])</code> или в pytest:
+  <code>pytest --device="iPhone 13"</code>.</p>
+{% endblock %}
+
+{% block head %}
+<style>
+  .nav { display: flex; gap: 16px; align-items: center; background: #1f2430; padding: 10px 16px; border-radius: 10px; color: #fff; }
+  .nav a { color: #fff; }
+  .links { display: flex; gap: 16px; }
+  #burger { display: none; }
+  @media (max-width: 599px) {
+    .links { display: none; flex-direction: column; position: absolute; top: 60px; left: 24px; right: 24px; background: #1f2430; padding: 12px; border-radius: 10px; }
+    .links.open { display: flex; }
+    #burger { display: inline-block; margin-left: auto; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="nav" aria-label="Главное меню">
+  <b>AQA Shop</b>
+  <button id="burger" aria-expanded="false">☰ Меню</button>
+  <div class="links" id="links">
+    <a href="#">Каталог</a><a href="#">Доставка</a><a href="#" id="contacts">Контакты</a>
+  </div>
+</nav>
+<p class="muted" style="margin-top: 24px" id="size"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  const size = () => document.getElementById('size').textContent = `Ширина окна: ${innerWidth}px`;
+  size(); addEventListener('resize', size);
+  document.getElementById('burger').addEventListener('click', e => {
+    const open = document.getElementById('links').classList.toggle('open');
+    e.target.setAttribute('aria-expanded', String(open));
+  });
+  document.getElementById('contacts').addEventListener('click', e => {
+    e.preventDefault();
+    if (innerWidth >= 600) return Lab.fail('это десктопная версия — нужен мобильный viewport');
+    Lab.success('Контакты открыты из мобильного меню');
+  });
+</script>
+{% endblock %}

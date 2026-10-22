@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="{{ url_for('static', filename='play.css') }}">
+</head>
+<body style="min-height: 0; background: #fff">
+  <form id="sub" style="padding: 16px">
+    <h3>📬 Рассылка</h3>
+    <div class="row">
+      <input type="email" placeholder="Ваш email" required>
+      <button class="primary" type="submit">Подписаться</button>
+    </div>
+    <p id="msg" class="ok"></p>
+  </form>
+  <script>
+    document.getElementById('sub').addEventListener('submit', e => {
+      e.preventDefault();
+      const email = e.target.querySelector('input').value.trim();
+      document.getElementById('msg').textContent = 'Подписка оформлена: ' + email;
+      if (email === 'student@aqa.lab') parent.Lab.success('Подписка внутри iframe оформлена');
+      else parent.Lab.fail('Ожидался email student@aqa.lab');
+    });
+  </script>
+</body>
+</html>

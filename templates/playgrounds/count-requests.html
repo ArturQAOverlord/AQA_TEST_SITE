@@ -1,0 +1,51 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Под статьёй три кнопки: «Нравится», «В избранное», «Поделиться». Каждая отправляет событие аналитики
+  <code>POST /api/analytics/track</code> с телом <code>{"event": "..."}</code>.</p>
+<p>Нажми все три по порядку и проверь, что ушло <b>ровно три</b> события: <code>like</code>, <code>favorite</code>,
+  <code>share</code> — именно в таком порядке, без дублей.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Подпишись на все запросы и складывай нужные в список:</p>
+<pre><code>events = []
+page.on("request", lambda request: events.append(request.post_data_json["event"])
+        if "/api/analytics/track" in request.url else None)</code></pre>
+<p>Запросы асинхронные — после последнего клика их ещё может не быть в списке. Дождись, например, через
+  <code>page.expect_request(...)</code> вокруг последнего клика, или подожди, пока счётчик на странице станет 3.
+  А чтобы поймать лишний дубль, полезно ещё немного подождать после этого.</p>
+{% endblock %}
+
+{% block content %}
+<article class="panel stack" style="max-width: 520px">
+  <h3>Как перестать бояться флейков</h3>
+  <p class="muted">Флейки — это не магия, а гонки. Разберёмся, откуда они берутся…</p>
+  <div class="row">
+    <button data-event="like">👍 Нравится</button>
+    <button data-event="favorite">⭐ В избранное</button>
+    <button data-event="share">🔗 Поделиться</button>
+  </div>
+  <p class="muted" data-testid="sent">Отправлено событий: 0</p>
+</article>
+{% endblock %}
+
+{% block script %}
+<script>
+  let sent = 0;
+  const clicked = [];
+  const track = event => fetch('/api/analytics/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) })
+    .then(() => { sent++; document.querySelector('[data-testid="sent"]').textContent = `Отправлено событий: ${sent}`; });
+  document.querySelectorAll('[data-event]').forEach(b => b.addEventListener('click', async () => {
+    const ev = b.dataset.event;
+    clicked.push(ev);
+    b.disabled = true;
+    await track(ev === 'share' && Lab.mutant === 'wrong-event' ? 'shared' : ev);
+    if (ev === 'like' && Lab.mutant === 'double-like') setTimeout(() => track('like'), 300);
+    if (clicked.length === 3) {
+      if (clicked.join() === 'like,favorite,share') Lab.success('Все кнопки нажаты — проверь запросы');
+      else Lab.fail('кнопки нажаты не по порядку');
+    }
+  }));
+</script>
+{% endblock %}

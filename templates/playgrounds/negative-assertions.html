@@ -1,0 +1,47 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Подписка на новости с валидацией email.</p>
+<ol>
+  <li>Убедись, что сообщения об ошибке изначально <b>нет</b> на экране.</li>
+  <li>Введи <code>not-an-email</code>, нажми «Подписаться» и проверь, что появилась ошибка «Некорректный email».</li>
+  <li>Исправь email на <code>me@aqa.lab</code>, снова нажми «Подписаться».</li>
+  <li>Проверь, что ошибка <b>исчезла</b>, а кнопка «Подписаться» пропала совсем.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Для отрицаний используй <code>not_to_...</code> или «обратные» проверки:</p>
+<pre><code>expect(error).not_to_be_visible()   # то же, что to_be_hidden()
+expect(button).not_to_be_attached()  # элемента больше нет в DOM</code></pre>
+<p>Не пиши <code>assert not error.is_visible()</code> — такая проверка не ждёт и может пройти раньше,
+  чем ошибка успеет появиться или исчезнуть.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="form" style="max-width: 420px" novalidate>
+  <div class="field"><label for="email">Email</label><input id="email" type="email"></div>
+  <p class="error hidden" id="error" role="alert">Некорректный email</p>
+  <div id="actions"><button class="primary" type="submit">Подписаться</button></div>
+  <p class="ok hidden" id="done">Вы подписаны!</p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  let sawError = false;
+  if (Lab.mutant === 'error-on-load') document.getElementById('error').classList.remove('hidden');
+  document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const v = document.getElementById('email').value.trim();
+    await Lab.sleep(400);
+    const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+    if (!valid || Lab.mutant !== 'error-stays') document.getElementById('error').classList.toggle('hidden', valid);
+    if (!valid) { sawError = true; return; }
+    if (Lab.mutant !== 'button-stays') document.getElementById('actions').remove();
+    document.getElementById('done').classList.remove('hidden');
+    if (sawError) Lab.success('Ошибка исправлена — проверь, что она исчезла');
+    else Lab.fail('Сначала нужно было вызвать ошибку');
+  });
+</script>
+{% endblock %}

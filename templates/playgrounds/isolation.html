@@ -1,0 +1,83 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Общая доска задач, которой одновременно пользуется вся команда: пока идёт твой тест, «коллеги» добавляют и удаляют
+  свои карточки (доска обновляется каждую секунду). Так же ведут себя общие тестовые стенды и параллельный запуск тестов.</p>
+<ol>
+  <li>Создай карточку с <b>уникальным</b> названием. Сервер запоминает все названия и повтор не примет — тест с захардкоженным
+    названием пройдёт ровно один раз.</li>
+  <li>Проверь, что на доске ровно <b>одна</b> карточка с твоим названием.</li>
+  <li>Удали её и проверь, что она пропала.</li>
+</ol>
+<p>Не проверяй общее количество карточек на доске — оно меняется само. Чтобы убедиться, что тест независим, запусти его
+  несколько раз параллельно: размножь через <code>@pytest.mark.parametrize("run", range(4))</code> и запусти
+  <code>pytest exercises -k isolation -n 4</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>title = f"Тест {uuid.uuid4().hex[:8]}"
+card = page.get_by_role("listitem").filter(has=page.get_by_text(title, exact=True))
+expect(card).to_have_count(1)</code></pre>
+<p>Правило независимых тестов: каждый тест создаёт свои данные, ищет только их, убирает за собой и не рассчитывает
+  ни на порядок запуска, ни на «пустой» стенд.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 480px">
+  <h3>Доска команды</h3>
+  <form class="row" id="form">
+    <input id="title" aria-label="Название карточки" placeholder="Название карточки" style="flex: 1">
+    <button class="primary" type="submit">Создать</button>
+  </form>
+  <p class="error" role="alert" id="err"></p>
+  <ul class="plain" id="board" aria-label="Карточки"></ul>
+  <p class="muted" id="count"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const mine = new Set();
+  let busy = false;
+  async function load() {
+    if (busy) return;
+    const cards = await (await fetch('/api/board')).json();
+    const ul = document.getElementById('board');
+    ul.innerHTML = '';
+    cards.forEach(c => {
+      const li = document.createElement('li');
+      li.className = 'card row';
+      li.style.justifyContent = 'space-between';
+      li.style.marginBottom = '6px';
+      li.innerHTML = `<span></span><button>Удалить</button>`;
+      li.querySelector('span').textContent = c.title;
+      li.querySelector('button').addEventListener('click', async () => {
+        if (!mine.has(c.id)) return Lab.fail('удалена чужая карточка');
+        busy = true;
+        await fetch(`/api/board/${c.id}`, { method: 'DELETE' });
+        busy = false;
+        await load();
+        Lab.success('Своя карточка создана и удалена');
+      });
+      ul.appendChild(li);
+    });
+    document.getElementById('count').textContent = `Карточек на доске: ${cards.length}`;
+  }
+  document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const err = document.getElementById('err');
+    const title = document.getElementById('title').value.trim();
+    busy = true;
+    const r = await fetch('/api/board', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+    busy = false;
+    const data = await r.json();
+    if (!r.ok) { err.textContent = data.error; return; }
+    err.textContent = '';
+    mine.add(data.id);
+    document.getElementById('title').value = '';
+    await load();
+  });
+  load();
+  setInterval(load, 1000);
+</script>
+{% endblock %}

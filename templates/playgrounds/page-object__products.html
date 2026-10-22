@@ -1,0 +1,59 @@
+{% extends "play.html" %}
+
+{% block title %}Товары · Админка{% endblock %}
+
+{% block content %}
+<div class="panel stack" id="box" style="display: none">
+  <div class="row" style="justify-content: space-between">
+    <h2 style="margin: 0">Товары</h2>
+    <button class="primary" id="add">Добавить товар</button>
+  </div>
+  <table>
+    <thead><tr><th>Название</th><th>Цена</th><th>Категория</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+<div class="overlay hidden" id="ov">
+  <form class="modal stack" role="dialog" aria-labelledby="dlg-title" id="dlg">
+    <h3 id="dlg-title">Новый товар</h3>
+    <div class="field"><label for="f-name">Название</label><input id="f-name"></div>
+    <div class="field"><label for="f-price">Цена</label><input id="f-price" type="number"></div>
+    <div class="field"><label for="f-cat">Категория</label>
+      <select id="f-cat"><option>Периферия</option><option>Мониторы</option><option>Аудио</option></select>
+    </div>
+    <div class="row"><button type="button" id="cancel">Отмена</button><button class="primary" type="submit">Сохранить</button></div>
+  </form>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const products = [{ name: 'Наушники', price: 5990, cat: 'Аудио' }, { name: 'Колонка', price: 3490, cat: 'Аудио' }];
+  const want = ['Клавиатура|4990|Периферия', 'Монитор|19990|Мониторы', 'Мышь|1990|Периферия'];
+  const ov = document.getElementById('ov');
+  function render() {
+    document.getElementById('tbody').innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.price}</td><td>${p.cat}</td></tr>`).join('');
+    const have = new Set(products.map(p => `${p.name}|${p.price}|${p.cat}`));
+    if (want.every(w => have.has(w))) Lab.success('Все три товара добавлены');
+  }
+  fetch('/api/me').then(r => {
+    if (!r.ok) { location.href = '{{ url_for("playground", slug=mission.slug) }}'; return; }
+    document.getElementById('box').style.display = '';
+    render();
+  });
+  document.getElementById('add').addEventListener('click', () => {
+    document.getElementById('dlg').reset();
+    ov.classList.remove('hidden');
+  });
+  document.getElementById('cancel').addEventListener('click', () => ov.classList.add('hidden'));
+  document.getElementById('dlg').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = document.getElementById('f-name').value.trim();
+    const price = parseInt(document.getElementById('f-price').value, 10);
+    if (!name || Number.isNaN(price)) return;
+    products.push({ name, price, cat: document.getElementById('f-cat').value });
+    ov.classList.add('hidden');
+    render();
+  });
+</script>
+{% endblock %}

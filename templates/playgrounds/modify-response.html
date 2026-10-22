@@ -1,0 +1,43 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Профиль загружается из <code>GET /api/profile</code>. Сервер отвечает тарифом <code>"free"</code>.</p>
+<p>Нужно проверить, как выглядит профиль на тарифе Premium. Возьми <b>настоящий</b> ответ сервера, поменяй в нём только
+  <code>plan</code> на <code>"premium"</code> и проверь, что появился блок «Premium-функции».</p>
+<p>Полностью выдуманный ответ не пройдёт: страница сверяет поле <code>request_id</code> с заголовком
+  <code>X-Request-Id</code>, а они каждый раз новые.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>def make_premium(route):
+    response = route.fetch()          # настоящий запрос на сервер
+    data = response.json()
+    data["plan"] = "premium"
+    route.fulfill(response=response, json=data)  # заголовки и статус берутся из response
+
+page.route("**/api/profile", make_premium)</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px" id="profile"><span class="spinner"></span></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  (async () => {
+    const r = await fetch('/api/profile');
+    const data = await r.json();
+    const box = document.getElementById('profile');
+    if (r.headers.get('X-Request-Id') !== data.request_id) {
+      box.innerHTML = '<p class="error">Подпись ответа не совпала</p>';
+      return Lab.fail('Ответ сфабрикован — возьми настоящий через route.fetch()');
+    }
+    const premium = data.plan === 'premium';
+    box.innerHTML = `<h3>${data.name}</h3>
+      <span class="badge ${premium ? 'green' : ''}">Тариф: ${data.plan}</span>
+      ${premium ? '<section aria-label="Premium-функции"><h4>Premium-функции</h4><ul><li>Безлимитные прогоны</li><li>Видео тестов</li></ul></section>'
+                : '<p class="muted">Перейдите на Premium, чтобы открыть больше функций</p>'}`;
+    if (premium) Lab.success('Ответ подменён аккуратно');
+  })();
+</script>
+{% endblock %}

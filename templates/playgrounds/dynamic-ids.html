@@ -1,0 +1,36 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Форма подтверждения, сгенерированная фреймворком: <code>id</code> и классы элементов случайные и меняются
+  при каждой загрузке. Обнови страницу пару раз и посмотри в DevTools.</p>
+<p>Введи код <code>4242</code> в поле «Код из SMS» и нажми «Подтвердить».</p>
+{% endblock %}
+
+{% block hint %}
+<p>Не привязывайся к тому, что генерируется. Стабильные вещи здесь — подпись поля (<code>aria-label</code>)
+  и текст кнопки. Если без CSS никак — есть селекторы по префиксу: <code>[id^="otp-"]</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel" id="root" style="max-width: 380px"></div>
+<p class="muted" id="ids"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  const r = () => Math.random().toString(36).slice(2, 7);
+  const inputId = `otp-${Lab.rand(1000, 9999)}`;
+  const btnId = `btn-${r()}`;
+  document.getElementById('root').innerHTML = `
+    <div class="x-${r()}">
+      <h3 class="x-${r()}">Подтверждение входа</h3>
+      <input id="${inputId}" class="x-${r()}" aria-label="Код из SMS" inputmode="numeric">
+      <div style="margin-top: 12px"><button id="${btnId}" class="primary x-${r()}">Подтвердить</button></div>
+    </div>`;
+  document.getElementById('ids').textContent = `Сейчас id поля: #${inputId}, id кнопки: #${btnId}`;
+  document.getElementById(btnId).addEventListener('click', () => {
+    if (document.getElementById(inputId).value === '4242') Lab.success('Код подтверждён');
+    else Lab.fail('Неверный код');
+  });
+</script>
+{% endblock %}

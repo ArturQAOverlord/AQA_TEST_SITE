@@ -1,0 +1,50 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Страница FAQ. Вопросы — кнопки внутри заголовков, их состояние хранится в атрибуте <code>aria-expanded</code>.</p>
+<p>Раскрой вопрос <b>«Как вернуть товар?»</b> и проверь, что у кнопки стало <code>aria-expanded="true"</code>, а в ответе
+  есть фраза «14 дней». Другие вопросы не трогай.</p>
+<p>В боковой колонке «Популярное» есть <b>ссылка</b> с тем же текстом — клик по ней засчитывается как ошибка.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>get_by_text("Как вернуть товар?")</code> найдёт и кнопку, и ссылку. Уточни роль:
+  <code>page.get_by_role("button", name="Как вернуть товар?")</code>.</p>
+<p>Раскрытость — <code>to_have_attribute("aria-expanded", "true")</code>, ответ — элемент с ролью <code>region</code>,
+  подписанный этой кнопкой.</p>
+{% endblock %}
+
+{% block content %}
+<div class="row" style="align-items: flex-start">
+  <div class="panel" style="flex: 2" id="faq">
+    <h2>Частые вопросы</h2>
+    {% for q, a in [("Сколько стоит доставка?", "Бесплатно от 3000 ₽, иначе 299 ₽."),
+                    ("Как вернуть товар?", "Оформите возврат в личном кабинете в течение 14 дней с момента получения."),
+                    ("Можно ли оплатить при получении?", "Да, картой или наличными курьеру."),
+                    ("Как отследить заказ?", "Трек-номер придёт в SMS после отправки.")] %}
+    <h3 style="margin: 8px 0">
+      <button aria-expanded="false" aria-controls="a{{ loop.index }}" id="q{{ loop.index }}"
+              style="width: 100%; text-align: left">{{ q }}</button>
+    </h3>
+    <div id="a{{ loop.index }}" role="region" aria-labelledby="q{{ loop.index }}" class="hidden" style="padding: 4px 12px">{{ a }}</div>
+    {% endfor %}
+  </div>
+  <aside class="panel" style="flex: 1">
+    <h3>Популярное</h3>
+    <ul class="plain"><li><a href="#" id="popular">Как вернуть товар?</a></li><li><a href="#">Условия гарантии</a></li></ul>
+  </aside>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('#faq button').forEach(btn => btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    document.getElementById(btn.getAttribute('aria-controls')).classList.toggle('hidden', !open);
+    if (btn.id !== 'q2') return Lab.fail(`раскрыт другой вопрос: «${btn.textContent}»`);
+    if (open) Lab.success('Нужный вопрос раскрыт');
+  }));
+  document.getElementById('popular').addEventListener('click', e => { e.preventDefault(); Lab.fail('это ссылка, а не вопрос FAQ'); });
+</script>
+{% endblock %}

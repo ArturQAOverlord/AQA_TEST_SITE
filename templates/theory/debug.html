@@ -1,0 +1,9 @@
+<p>Тест упал в CI — что дальше? Сообщение об ошибке говорит <i>что</i> не так, артефакты — <i>почему</i>.</p>
+<ul>
+  <li><b>Trace</b> (<code>--tracing retain-on-failure</code>, уже включено в <code>pytest.ini</code>): DOM-снимки до и после каждого действия,
+    консоль, сеть, исходник теста. Открыть: <code>playwright show-trace trace.zip</code> или trace.playwright.dev.</li>
+  <li><b>Скриншот и видео</b>: <code>--screenshot only-on-failure</code>, <code>--video retain-on-failure</code>, всё складывается в <code>test-results/</code>.</li>
+  <li><b>Отладка локально</b>: <code>PWDEBUG=1</code> открывает Inspector, <code>page.pause()</code> останавливает тест в нужном месте.</li>
+  <li><b>Визуальные проверки</b> ловят то, что не видно в DOM: сдвиги, цвета, шрифты. Динамические части маскируют, анимации отключают.</li>
+  <li><b>Allure</b> превращает прогон в отчёт с шагами и вложениями — понятный не только автору теста.</li>
+</ul>

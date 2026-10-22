@@ -1,0 +1,39 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Список задач. Одна из них закреплена — у неё есть иконка-кнопка с <code>data-testid="icon-pinned"</code>, но никакого текста
+  про закрепление. Нажми <b>«Выполнить»</b> у закреплённой задачи.</p>
+<p>Какая задача закреплена, решается случайно при загрузке.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>filter(has=...)</code> оставляет элементы, внутри которых есть другой локатор:</p>
+<pre><code>pinned = page.get_by_role("listitem").filter(has=page.get_by_test_id("icon-pinned"))</code></pre>
+<p>Есть и обратный вариант — <code>filter(has_not=...)</code>.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Мои задачи</h2>
+<ul class="plain" id="tasks"></ul>
+{% endblock %}
+
+{% block script %}
+<script>
+  const titles = ['Обновить зависимости', 'Написать тест на логин', 'Разобрать баг-репорты', 'Настроить CI', 'Ревью PR #42'];
+  const pinned = Lab.rand(0, titles.length - 1);
+  const ul = document.getElementById('tasks');
+  titles.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'card row';
+    li.innerHTML = (i === pinned ? '<svg data-testid="icon-pinned" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="#d29922"/></svg>' : '')
+      + `<span style="flex:1">${t}</span><button>Выполнить</button>`;
+    li.querySelector('button').addEventListener('click', e => {
+      e.target.disabled = true;
+      li.style.opacity = .6;
+      if (i === pinned) Lab.success('Закреплённая задача выполнена');
+      else Lab.fail('Это не закреплённая задача');
+    });
+    ul.appendChild(li);
+  });
+</script>
+{% endblock %}

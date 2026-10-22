@@ -1,0 +1,32 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Нажми «Загрузить профиль». Через 1,5–3 секунды появится карточка пользователя — нажми в ней «Написать сообщение».</p>
+<p>Никаких <code>time.sleep()</code>! Playwright сам ждёт появления элемента перед действием.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Просто кликай по кнопке в карточке. <code>click()</code> ждёт до 30 секунд, пока элемент появится и станет кликабельным.
+  Можно для наглядности добавить <code>expect(...).to_be_visible()</code> перед кликом.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <button class="primary" id="load">Загрузить профиль</button>
+  <div id="loader" class="hidden"><span class="spinner"></span> Загружаем…</div>
+  <div id="profile"></div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('load').addEventListener('click', async () => {
+    document.getElementById('loader').classList.remove('hidden');
+    await Lab.sleep(Lab.rand(1500, 3000));
+    document.getElementById('loader').classList.add('hidden');
+    const p = document.getElementById('profile');
+    p.innerHTML = '<div class="card stack"><b>Алиса Иванова</b><span class="muted">Senior AQA</span><button>Написать сообщение</button></div>';
+    p.querySelector('button').addEventListener('click', () => Lab.success('Сообщение Алисе отправлено'));
+  });
+</script>
+{% endblock %}

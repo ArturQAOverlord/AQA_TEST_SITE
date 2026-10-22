@@ -1,0 +1,41 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Иногда важен не текст, а внешний вид: опасная кнопка должна быть красной, а тёмная тема — тёмной.</p>
+<ol>
+  <li>Проверь, что фон кнопки «Удалить аккаунт» — <code>rgb(207, 34, 46)</code>.</li>
+  <li>Включи переключатель «Тёмная тема».</li>
+  <li>Проверь, что фон панели настроек стал <code>rgb(31, 36, 48)</code>, а цвет текста — <code>rgb(230, 233, 239)</code>.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>expect(button).to_have_css("background-color", "rgb(207, 34, 46)")</code></pre>
+<p>Сравнивается <b>вычисленный</b> стиль (getComputedStyle), поэтому цвета всегда в формате <code>rgb(...)</code>,
+  даже если в CSS написано <code>#cf222e</code>. Панель — <code>page.get_by_test_id("settings-panel")</code>.</p>
+{% endblock %}
+
+{% block head %}
+<style>
+  #panel { transition: none; }
+  #panel.dark { background: #1f2430; color: #e6e9ef; }
+  .danger-btn { background: {{ "#db6d28" if mutant == "danger-color" else "#cf222e" }}; color: #fff; border-color: transparent; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px" id="panel" data-testid="settings-panel">
+  <h3>Настройки</h3>
+  <label class="inline"><input type="checkbox" role="switch" id="dark"> Тёмная тема</label>
+  <button class="danger-btn">Удалить аккаунт</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('dark').addEventListener('change', e => {
+    if (Lab.mutant !== 'theme-not-applied') document.getElementById('panel').classList.toggle('dark', e.target.checked);
+    if (e.target.checked) Lab.success('Тема переключена — проверь стили');
+  });
+</script>
+{% endblock %}

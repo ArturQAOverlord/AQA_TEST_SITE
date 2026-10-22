@@ -1,0 +1,40 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Витрина при загрузке берёт товары из <code>GET /api/products</code>. Подмени ответ, чтобы на витрине оказались
+  ровно два товара:</p>
+<pre><code>[
+  {"id": 1, "name": "Кружка Playwright", "price": 990},
+  {"id": 2, "name": "Футболка pytest", "price": 1990}
+]</code></pre>
+<p>Проверь, что на странице 2 карточки, первая — «Кружка Playwright», и написано «Итого: 2980 ₽».</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.route("**/api/products", lambda route: route.fulfill(json=[...]))
+page.goto("/play/mock-data")</code></pre>
+<p>Параметр <code>json=</code> сам сериализует данные и выставит <code>Content-Type: application/json</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <h2>Витрина</h2>
+  <ul class="plain grid" id="products" aria-label="Товары"><li class="muted">Загрузка…</li></ul>
+  <p id="total" class="muted"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  fetch('/api/products').then(r => r.json()).then(items => {
+    const names = items.map(i => i.name).join('|');
+    const shown = Lab.mutant === 'extra-card' ? [...items, { name: 'Реклама: курс по Selenium', price: 0 }] : items;
+    document.getElementById('products').innerHTML = shown.map(i =>
+      `<li class="card stack"><b>${i.name}</b><span class="muted">${i.price} ₽</span></li>`).join('');
+    const counted = Lab.mutant === 'wrong-total' ? items.slice(0, -1) : items;
+    document.getElementById('total').textContent = 'Итого: ' + counted.reduce((s, i) => s + i.price, 0) + ' ₽';
+    if (names === 'Кружка Playwright|Футболка pytest') Lab.success('Витрина показывает замоканные товары');
+    else Lab.fail('на витрине не те товары — ответ API не замокан');
+  });
+</script>
+{% endblock %}

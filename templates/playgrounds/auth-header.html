@@ -1,0 +1,41 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Кнопка «Загрузить секрет» запрашивает <code>GET /api/secret</code>, но страница забыла передать токен, и сервер
+  отвечает <b>401</b>.</p>
+<p>Добавь к этому запросу заголовок <code>Authorization: Bearer lab-token</code>, нажми кнопку и проверь, что на
+  странице появился код вида <code>LAB-XXXXXX</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Вариант 1 — дописать заголовок в перехваченный запрос, сохранив остальные:</p>
+<pre><code>def add_token(route):
+    route.continue_(headers={**route.request.headers, "authorization": "Bearer lab-token"})
+
+page.route("**/api/secret", add_token)</code></pre>
+<p>Вариант 2 — заголовок на все запросы контекста: <code>page.context.set_extra_http_headers({...})</code>.
+  Он грубее: токен уйдёт вообще на все адреса, включая сторонние.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Секретный раздел</h3>
+  <button class="primary" id="load">Загрузить секрет</button>
+  <p id="result" class="muted"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('load').addEventListener('click', async () => {
+    const r = await fetch('/api/secret');
+    const result = document.getElementById('result');
+    if (r.status === 401) { result.className = 'error'; result.textContent = 'Нет доступа (401)'; return; }
+    const data = await r.json();
+    result.className = 'ok';
+    result.textContent = 'Секретный код: ' + data.code;
+    if (/^LAB-[0-9A-F]{6}$/.test(data.code)) Lab.success('Доступ получен');
+    else Lab.fail('ответ сервера подделан');
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Виджет курса валют. «Обновить курс» отправляет запрос <code>GET /api/rates</code>, но на экран выводит только
+  время обновления — <b>самого курса на странице нет</b>.</p>
+<p>Достань значение поля <code>rate</code> из JSON-ответа, впиши его в поле «Курс из ответа» и нажми «Проверить».</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>with page.expect_response("**/api/rates") as response_info:
+    page.get_by_role("button", name="Обновить курс").click()
+rate = response_info.value.json()["rate"]</code></pre>
+<p>Подписаться на ожидание нужно <b>до</b> клика — иначе быстрый ответ можно пропустить. Конструкция
+  <code>with</code> делает именно это.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>USD → RUB</h3>
+  <button id="refresh">Обновить курс</button>
+  <p id="updated" class="muted">Курс ещё не загружен</p>
+  <div class="field"><label for="answer">Курс из ответа</label><input id="answer"></div>
+  <button class="primary" id="check">Проверить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let rate = null;
+  document.getElementById('refresh').addEventListener('click', async () => {
+    document.getElementById('updated').textContent = 'Обновляем…';
+    const data = await (await fetch('/api/rates')).json();
+    rate = data.rate;
+    document.getElementById('updated').textContent = 'Курс обновлён в ' + new Date().toLocaleTimeString('ru-RU');
+  });
+  document.getElementById('check').addEventListener('click', () => {
+    if (rate === null) return Lab.fail('Курс ещё не загружали');
+    const answer = parseFloat(document.getElementById('answer').value.replace(',', '.'));
+    if (answer === rate) Lab.success('Курс совпал с ответом сервера');
+    else Lab.fail('Значение не совпадает с последним ответом сервера');
+  });
+</script>
+{% endblock %}

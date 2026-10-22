@@ -1,0 +1,64 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Анкета разработчика:</p>
+<ul>
+  <li>В списке «Страна» выбери <b>Казахстан</b> (по видимому тексту).</li>
+  <li>В списке «Опыт» выбери вариант со значением <code>value="senior"</code>.</li>
+  <li>В множественном списке «Языки» выбери <b>Python</b> и <b>JavaScript</b>.</li>
+  <li>Нажми «Сохранить».</li>
+</ul>
+{% endblock %}
+
+{% block hint %}
+<p><code>select_option()</code> принимает value, <code>label=</code>, <code>index=</code> или список значений для multiple:</p>
+<pre><code>page.get_by_label("Страна").select_option(label="Казахстан")
+page.get_by_label("Опыт").select_option("senior")
+page.get_by_label("Языки").select_option(["python", "js"])</code></pre>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="form" style="max-width: 380px">
+  <div class="field"><label for="country">Страна</label>
+    <select id="country">
+      <option value="">— выберите —</option>
+      <option value="ru">Россия</option>
+      <option value="kz">Казахстан</option>
+      <option value="by">Беларусь</option>
+      <option value="uz">Узбекистан</option>
+    </select>
+  </div>
+  <div class="field"><label for="exp">Опыт</label>
+    <select id="exp">
+      <option value="junior">До 1 года</option>
+      <option value="middle">1–3 года</option>
+      <option value="senior">Больше 3 лет</option>
+    </select>
+  </div>
+  <div class="field"><label for="langs">Языки</label>
+    <select id="langs" multiple size="5">
+      <option value="python">Python</option>
+      <option value="js">JavaScript</option>
+      <option value="java">Java</option>
+      <option value="cs">C#</option>
+      <option value="go">Go</option>
+    </select>
+  </div>
+  <button class="primary" type="submit">Сохранить</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const langs = [...document.getElementById('langs').selectedOptions].map(o => o.value).sort().join(',');
+    const errors = [];
+    if (document.getElementById('country').value !== 'kz') errors.push('страна');
+    if (document.getElementById('exp').value !== 'senior') errors.push('опыт');
+    if (langs !== 'js,python') errors.push('языки');
+    if (errors.length) Lab.fail('Проверь: ' + errors.join(', '));
+    else Lab.success('Анкета сохранена');
+  });
+</script>
+{% endblock %}

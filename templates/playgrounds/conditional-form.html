@@ -1,0 +1,61 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Заявка на подключение. Поля появляются в зависимости от выбора:</p>
+<ul>
+  <li>«Тип клиента» = «Юридическое лицо» → появляются «Название компании» и «ИНН»;</li>
+  <li>чекбокс «Нужна доставка» → появляется «Адрес доставки».</li>
+</ul>
+<p>Отправь заявку от юрлица: компания <code>ООО Тестировщики</code>, доставка нужна, адрес <code>Москва, Тверская, 7</code>.</p>
+<p>Сначала введи ИНН <code>12345</code> и проверь ошибку «ИНН должен содержать 10 цифр», потом исправь на
+  <code>7701234567</code> и отправь.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Перед выбором юрлица убедись, что поля ИНН ещё нет: <code>expect(page.get_by_label("ИНН")).to_be_hidden()</code>.
+  После выбора — что оно появилось.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="form" style="max-width: 420px" novalidate>
+  <div class="field"><label for="type">Тип клиента</label>
+    <select id="type"><option value="person">Физическое лицо</option><option value="company">Юридическое лицо</option></select>
+  </div>
+  <div id="company-fields" class="hidden">
+    <div class="field"><label for="company">Название компании</label><input id="company"></div>
+    <div class="field"><label for="inn">ИНН</label><input id="inn" inputmode="numeric"></div>
+  </div>
+  <div class="field"><label for="contact">Контактное лицо</label><input id="contact" value="Иван"></div>
+  <div class="field"><label class="inline"><input type="checkbox" id="delivery"> Нужна доставка</label></div>
+  <div class="field hidden" id="addr-field"><label for="addr">Адрес доставки</label><input id="addr"></div>
+  <p class="error" role="alert" id="err"></p>
+  <button class="primary" type="submit">Отправить заявку</button>
+  <p class="ok hidden" id="ok">Заявка принята</p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  const $ = id => document.getElementById(id);
+  let sawInnError = false;
+  $('type').addEventListener('change', () => $('company-fields').classList.toggle('hidden', $('type').value !== 'company'));
+  $('delivery').addEventListener('change', () => $('addr-field').classList.toggle('hidden', !$('delivery').checked));
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const company = $('type').value === 'company';
+    $('err').textContent = '';
+    if (company && !/^\d{10}$/.test($('inn').value)) {
+      $('err').textContent = Lab.mutant === 'inn-error-text' ? 'Неверный ИНН' : 'ИНН должен содержать 10 цифр';
+      sawInnError = true;
+      return;
+    }
+    if ($('delivery').checked && !$('addr').value.trim()) { $('err').textContent = 'Укажите адрес доставки'; return; }
+    if (Lab.mutant !== 'no-confirmation') $('ok').classList.remove('hidden');
+    const ok = company && $('company').value.trim() === 'ООО Тестировщики' && $('inn').value === '7701234567'
+      && $('delivery').checked && $('addr').value.trim() === 'Москва, Тверская, 7';
+    if (!ok) return Lab.fail('Заявка отправлена с другими данными');
+    if (!sawInnError) return Lab.fail('Пропущена проверка ошибки ИНН');
+    Lab.success('Заявка юрлица с доставкой отправлена');
+  });
+</script>
+{% endblock %}

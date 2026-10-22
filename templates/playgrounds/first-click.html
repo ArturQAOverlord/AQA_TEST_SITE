@@ -1,0 +1,34 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Разминка. На странице есть приветствие и кнопка <b>«Начать»</b>. Нажми её.</p>
+<p>Самый надёжный способ найти кнопку — по её <b>роли</b> и <b>доступному имени</b>, так, как её «видит» пользователь
+  и скринридер:</p>
+<pre><code>page.get_by_role("button", name="...")</code></pre>
+<p>Когда задание выполнено, внизу песочницы статус меняется на «Миссия пройдена», а у элемента
+  <code>data-testid="mission-status"</code> появляется <code>data-status="success"</code> — это и проверяет последняя строка шаблона.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Роль кнопки — <code>"button"</code>, имя — текст на ней. Остаётся вызвать <code>.click()</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <h2>Добро пожаловать в лабораторию 👋</h2>
+  <p>Здесь ты научишься находить элементы так, чтобы тесты не ломались от каждого изменения вёрстки.</p>
+  <p class="muted">Ссылка ниже — просто отвлекающий манёвр.</p>
+  <p><a href="#" onclick="return false">Начать позже</a></p>
+  <button class="primary" id="start">Начать</button>
+  <p id="greeting" class="ok hidden">Поехали! 🚀</p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('start').addEventListener('click', () => {
+    document.getElementById('greeting').classList.remove('hidden');
+    Lab.success();
+  });
+</script>
+{% endblock %}

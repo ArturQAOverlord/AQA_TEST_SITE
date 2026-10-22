@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+progress.json
+verified.json
+data/
+test-results/
+allure-results/
+allure-report/
+# Эталоны скриншотов зависят от ОС и шрифтов — у каждого свои
+__snapshots__/

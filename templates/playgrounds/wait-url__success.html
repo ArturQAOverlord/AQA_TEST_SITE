@@ -1,0 +1,18 @@
+{% extends "play.html" %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 380px">
+  <h1>{{ "Оплата обрабатывается" if mutant == "wrong-heading" else "Оплата прошла" }}</h1>
+  <p>Заказ <b id="order"></b> оплачен. Чек отправлен на почту.</p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('order').textContent = '№' + (new URLSearchParams(location.search).get('order') || '?');
+  let paid = null;
+  try { paid = sessionStorage.getItem('lab-paid'); sessionStorage.removeItem('lab-paid'); } catch {}
+  if (paid) Lab.success('Редирект на страницу успеха');
+  else Lab.fail('страница успеха открыта напрямую, без оплаты');
+</script>
+{% endblock %}

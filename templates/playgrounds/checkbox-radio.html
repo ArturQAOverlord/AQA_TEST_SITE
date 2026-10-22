@@ -1,0 +1,48 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Настройки приложения. Приведи их к такому виду и нажми «Сохранить»:</p>
+<ul>
+  <li>Тема — <b>Тёмная</b></li>
+  <li>«Письма на email» — <b>выключено</b> (сейчас включено)</li>
+  <li>«Push-уведомления» — <b>включено</b></li>
+  <li>«SMS» — <b>выключено</b> (его начальное состояние случайное!)</li>
+</ul>
+{% endblock %}
+
+{% block hint %}
+<p><code>check()</code> и <code>uncheck()</code> приводят чекбокс к нужному состоянию независимо от текущего —
+  в отличие от <code>click()</code>, который просто переключает. Для «нужно вот так» есть
+  <code>set_checked(False)</code>. Радиокнопки выбирают тем же <code>check()</code>.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel stack" id="form" style="max-width: 380px">
+  <fieldset style="border: 0; padding: 0">
+    <legend class="muted">Тема</legend>
+    <label class="inline"><input type="radio" name="theme" value="light" checked> Светлая</label>
+    <label class="inline"><input type="radio" name="theme" value="dark"> Тёмная</label>
+    <label class="inline"><input type="radio" name="theme" value="system"> Как в системе</label>
+  </fieldset>
+  <fieldset style="border: 0; padding: 0">
+    <legend class="muted">Уведомления</legend>
+    <label class="inline"><input type="checkbox" id="email" checked> Письма на email</label><br>
+    <label class="inline"><input type="checkbox" id="push"> Push-уведомления</label><br>
+    <label class="inline"><input type="checkbox" id="sms"> SMS</label>
+  </fieldset>
+  <button class="primary" type="submit">Сохранить</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('sms').checked = Math.random() < .5;
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const theme = document.querySelector('[name=theme]:checked').value;
+    const $ = id => document.getElementById(id).checked;
+    if (theme === 'dark' && !$('email') && $('push') && !$('sms')) Lab.success('Настройки сохранены');
+    else Lab.fail(`Сейчас: тема=${theme}, email=${$('email')}, push=${$('push')}, sms=${$('sms')}`);
+  });
+</script>
+{% endblock %}

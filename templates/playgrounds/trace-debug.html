@@ -1,0 +1,64 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Тест коллеги ночью упал в CI с ошибкой <code>expected "Итого: 8100 ₽", got "Итого: 9000 ₽"</code>. Локально у него
+  «всё работало». Вот тест:</p>
+<pre><code>def test_trace_debug(page: Page):
+    page.goto("/play/trace-debug")
+    page.get_by_placeholder("Промокод").fill("SALE10")
+    page.get_by_role("button", name="Применить").click()
+    expect(page.get_by_test_id("total")).to_have_text("Итого: 8100 ₽")
+    page.get_by_role("button", name="Оплатить").click()</code></pre>
+<p>Из CI остался только артефакт — <a href="{{ url_for('static', filename='traces/trace-debug.zip') }}" download>trace-debug.zip</a>.
+  Открой его, разберись, почему скидка не применилась, и напиши исправленный тест, который доходит до оплаты со скидкой.</p>
+<p>Не подсматривай в исходник страницы — в этом и смысл: в реальном CI его под рукой нет.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Открыть trace: <code>playwright show-trace trace-debug.zip</code> или перетащить файл на
+  <a href="https://trace.playwright.dev" target="_blank">trace.playwright.dev</a> (файл никуда не загружается).</p>
+<p>Пройдись по шагам слева и посмотри снимок DOM <b>после</b> клика «Применить» — там мелькнуло сообщение. Ещё загляни во
+  вкладку <b>Console</b>: приложение пишет туда, почему не приняло промокод.</p>
+<p>Свои упавшие тесты разбирать так же: в этом проекте <code>--tracing retain-on-failure</code> уже включён в
+  <code>pytest.ini</code>, trace лежит в <code>test-results/</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Оформление заказа</h3>
+  <p>Курс «Playwright Pro» — 9000 ₽</p>
+  <div class="row">
+    <input placeholder="Промокод" id="code">
+    <button id="apply">Применить</button>
+  </div>
+  <div id="toast" class="error hidden" role="alert"></div>
+  <p><b data-testid="total" id="total">Итого: 9000 ₽</b></p>
+  <button class="primary" id="pay">Оплатить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const PRICE = 9000;
+  let applied = null;
+  document.getElementById('apply').addEventListener('click', async () => {
+    const code = document.getElementById('code').value.trim().toUpperCase();
+    const toast = document.getElementById('toast');
+    if (code === 'AUTUMN26') {
+      applied = code;
+      document.getElementById('total').textContent = `Итого: ${PRICE * 0.9} ₽`;
+      return;
+    }
+    if (code === 'SALE10') console.warn('[promo] Промокод SALE10 истёк 30.09.2026. Действующий промокод: AUTUMN26');
+    else console.warn(`[promo] Неизвестный промокод: ${code}`);
+    toast.textContent = 'Промокод недействителен';
+    toast.classList.remove('hidden');
+    await Lab.sleep(1200);
+    toast.classList.add('hidden');
+  });
+  document.getElementById('pay').addEventListener('click', () => {
+    if (applied) Lab.success('Оплачено со скидкой');
+    else Lab.fail('оплата без скидки');
+  });
+</script>
+{% endblock %}

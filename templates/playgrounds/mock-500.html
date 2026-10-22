@@ -1,0 +1,55 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Список команды загружается кнопкой «Загрузить пользователей» (<code>GET /api/users</code>).
+  Настоящий сервер никогда не падает, а нам нужно проверить экран ошибки.</p>
+<ol>
+  <li>Замокай ответ <code>/api/users</code> со статусом <b>500</b>.</li>
+  <li>Нажми «Загрузить пользователей» и проверь сообщение «Сервер недоступен (500)».</li>
+  <li>Сними мок и нажми «Повторить» — должны загрузиться 3 настоящих пользователя.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.route("**/api/users", lambda route: route.fulfill(status=500, body="Internal Server Error"))
+...
+page.unroute("**/api/users")</code></pre>
+<p><code>unroute</code> снимает обработчики для этого шаблона, и запросы снова идут на настоящий сервер.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Команда</h3>
+  <button class="primary" id="load">Загрузить пользователей</button>
+  <div id="error" class="hidden">
+    <p class="error" role="alert" id="error-text"></p>
+    <button id="retry">Повторить</button>
+  </div>
+  <ul id="users" class="plain"></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let sawError = false;
+  async function load() {
+    document.getElementById('error').classList.add('hidden');
+    document.getElementById('users').innerHTML = '<li class="muted">Загрузка…</li>';
+    const r = await fetch('/api/users');
+    if (!r.ok) {
+      document.getElementById('users').innerHTML = '';
+      document.getElementById('error-text').textContent = Lab.mutant === 'no-code' ? 'Сервер недоступен' : `Сервер недоступен (${r.status})`;
+      document.getElementById('error').classList.remove('hidden');
+      if (r.status === 500) sawError = true;
+      return;
+    }
+    let users = await r.json();
+    if (Lab.mutant === 'retry-broken') users = users.slice(0, 2);
+    document.getElementById('users').innerHTML = users.map(u => `<li class="card">${u.name} — <span class="muted">${u.role}</span></li>`).join('');
+    if (sawError && users.length) Lab.success('Ошибка показана, повтор сработал');
+    else if (!sawError) Lab.fail('пользователи загрузились без ошибки 500 — мок не сработал');
+  }
+  document.getElementById('load').addEventListener('click', load);
+  document.getElementById('retry').addEventListener('click', load);
+</script>
+{% endblock %}

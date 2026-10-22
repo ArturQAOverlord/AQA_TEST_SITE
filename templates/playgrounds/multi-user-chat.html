@@ -1,0 +1,81 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Чат в реальном времени: сообщения приходят по Server-Sent Events. Комната задаётся параметром
+  <code>?room=…</code> — у двух участников он должен совпадать.</p>
+<ol>
+  <li>Придумай уникальный id комнаты (<code>uuid4().hex</code>) — чтобы параллельные тесты не попали в одну комнату.</li>
+  <li>Алиса (фикстура <code>page</code>) и Борис (<b>второй контекст браузера</b>) входят в комнату под своими именами.</li>
+  <li>Алиса пишет «Привет, Борис!» — проверь, что Борис его увидел. Борис отвечает «Привет, Алиса!» — проверь у Алисы.</li>
+</ol>
+<p>Миссия засчитывается на странице каждого участника, который и отправил, и получил сообщение. Проверь статус у обоих.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>def test_multi_user_chat(page: Page, browser: Browser, browser_context_args: dict):
+    room = uuid.uuid4().hex
+    bob_context = browser.new_context(**browser_context_args)
+    bob = bob_context.new_page()
+    ...
+    bob_context.close()</code></pre>
+<p>Два контекста — два независимых «браузера» с разными cookies. Две вкладки одного контекста для этого не годятся:
+  у них общая сессия.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 480px">
+  <h3>Командный чат</h3>
+  <p class="muted" id="room-info"></p>
+  <div id="join" class="row">
+    <input id="name" aria-label="Ваше имя" placeholder="Ваше имя">
+    <button class="primary" id="enter">Войти в чат</button>
+  </div>
+  <div id="chat" class="hidden stack">
+    <ul class="plain card" role="log" aria-label="Сообщения" id="log" style="min-height: 140px; max-height: 260px; overflow:auto"></ul>
+    <div class="row">
+      <input id="text" aria-label="Сообщение" placeholder="Сообщение" style="flex: 1">
+      <button class="primary" id="send">Отправить</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const params = new URLSearchParams(location.search);
+  let room = params.get('room');
+  if (!room) {
+    room = Math.random().toString(36).slice(2, 10);
+    history.replaceState({}, '', '?room=' + room);
+  }
+  document.getElementById('room-info').textContent = `Комната: ${room}. Второй участник должен открыть ту же ссылку.`;
+  let me = null, sent = 0, receivedFromOthers = 0;
+  const check = () => { if (sent && receivedFromOthers) Lab.success(`${me} поговорил(а) в чате`); };
+  document.getElementById('enter').addEventListener('click', () => {
+    me = document.getElementById('name').value.trim();
+    if (!me) return;
+    document.getElementById('join').classList.add('hidden');
+    document.getElementById('chat').classList.remove('hidden');
+    const source = new EventSource('/api/chat/stream?room=' + encodeURIComponent(room));
+    source.onmessage = ev => {
+      const msg = JSON.parse(ev.data);
+      const li = document.createElement('li');
+      li.textContent = `${msg.author}: ${msg.text}`;
+      document.getElementById('log').appendChild(li);
+      if (msg.author !== me) { receivedFromOthers++; check(); }
+    };
+  });
+  async function send() {
+    const input = document.getElementById('text');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room, author: me, text }) });
+    sent++;
+    check();
+  }
+  document.getElementById('send').addEventListener('click', send);
+  document.getElementById('text').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+</script>
+{% endblock %}

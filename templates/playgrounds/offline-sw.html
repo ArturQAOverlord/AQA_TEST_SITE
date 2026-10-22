@@ -1,0 +1,63 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Блог умеет работать без интернета: Service Worker кэширует страницу и статьи, а без сети отвечает из кэша.</p>
+<ol>
+  <li>Открой страницу и дождись надписи «Офлайн-режим готов» (Service Worker установлен и управляет страницей).</li>
+  <li>Отключи сеть у контекста и перезагрузи страницу. Проверь, что видна плашка «Нет сети — показаны сохранённые статьи»
+    и все 3 статьи.</li>
+  <li>Включи сеть обратно, дождись, пока плашка исчезнет, и нажми «Синхронизировать».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.context.set_offline(True)
+page.reload()
+...
+page.context.set_offline(False)</code></pre>
+<p>Без Service Worker'а <code>reload()</code> в офлайне закончился бы ошибкой браузера. Если в проекте SW мешает
+  (например, перехватывает запросы мимо <code>page.route</code>), его отключают: <code>new_context(service_workers="block")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 460px">
+  <p class="error hidden" role="alert" id="offline">Нет сети — показаны сохранённые статьи</p>
+  <h3>Блог</h3>
+  <ul id="articles" aria-label="Статьи"><li class="muted">Загрузка…</li></ul>
+  <p class="muted" data-testid="sw-state" id="sw-state">Офлайн-режим настраивается…</p>
+  <button class="primary" id="sync">Синхронизировать</button>
+  <p id="sync-msg" class="muted"></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const loadedOffline = !navigator.onLine;
+  const banner = () => document.getElementById('offline').classList.toggle('hidden', navigator.onLine);
+  addEventListener('online', banner);
+  addEventListener('offline', banner);
+  banner();
+
+  fetch('/api/articles').then(r => r.json()).then(items => {
+    document.getElementById('articles').innerHTML = items.map(a => `<li>${a.title}</li>`).join('');
+  }).catch(() => { document.getElementById('articles').innerHTML = '<li class="error">Не удалось загрузить статьи</li>'; });
+
+  const swState = () => {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) document.getElementById('sw-state').textContent = 'Офлайн-режим готов';
+  };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', swState);
+    navigator.serviceWorker.register('/sw-offline.js', { scope: '/play/offline-sw' }).then(swState);
+  } else {
+    document.getElementById('sw-state').textContent = 'Браузер не поддерживает Service Worker';
+  }
+
+  document.getElementById('sync').addEventListener('click', () => {
+    const msg = document.getElementById('sync-msg');
+    if (!navigator.onLine) { msg.textContent = 'Нет сети — синхронизация невозможна'; return; }
+    if (!loadedOffline) { msg.textContent = 'Сначала проверь, что страница открывается без сети'; return; }
+    msg.textContent = 'Синхронизировано';
+    Lab.success('Страница пережила офлайн');
+  });
+</script>
+{% endblock %}

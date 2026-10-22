@@ -1,0 +1,57 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Панель настроек собрана из веб-компонентов, вложенных друг в друга:
+  <code>&lt;app-shell&gt;</code> → <code>&lt;settings-panel&gt;</code> → <code>&lt;toggle-row&gt;</code>, у каждого свой open shadow root.</p>
+<p>Включи переключатель <b>«Push-уведомления»</b> (и только его) и проверь, что у него <code>aria-checked="true"</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Сколько бы уровней Shadow DOM ни было, role- и CSS-локаторы проходят их насквозь:
+  <code>page.get_by_role("switch", name="Push-уведомления")</code>. Рядом есть «Push-уведомления по ночам» —
+  не забудь про <code>exact=True</code>.</p>
+<p>В DevTools попробуй <code>document.querySelector('toggle-row')</code> — получишь <code>null</code>.
+  Обычный DOM API в shadow root не заглядывает, а Playwright — да.</p>
+{% endblock %}
+
+{% block content %}
+<app-shell></app-shell>
+{% endblock %}
+
+{% block script %}
+<script>
+  const style = `<style>
+    :host { display:block; font: 15px system-ui, sans-serif; }
+    .box { background:#fff; border:1px solid #dde2ec; border-radius:12px; padding:16px; max-width:420px; }
+    .row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; }
+    button { width:46px; height:26px; border-radius:13px; border:0; background:#c9d1e0; cursor:pointer; }
+    button[aria-checked="true"] { background:#1a7f37; }
+  </style>`;
+  customElements.define('toggle-row', class extends HTMLElement {
+    connectedCallback() {
+      const root = this.attachShadow({ mode: 'open' });
+      const label = this.getAttribute('label');
+      root.innerHTML = `${style}<div class="row"><span id="l">${label}</span><button role="switch" aria-checked="false" aria-labelledby="l"></button></div>`;
+      root.querySelector('button').addEventListener('click', e => {
+        const on = e.target.getAttribute('aria-checked') !== 'true';
+        e.target.setAttribute('aria-checked', String(on));
+        if (label !== 'Push-уведомления') return Lab.fail(`включён не тот переключатель: «${label}»`);
+        if (on) Lab.success('Push-уведомления включены');
+      });
+    }
+  });
+  customElements.define('settings-panel', class extends HTMLElement {
+    connectedCallback() {
+      this.attachShadow({ mode: 'open' }).innerHTML = `${style}<div class="box"><b>Уведомления</b>
+        <toggle-row label="Email-рассылка"></toggle-row>
+        <toggle-row label="Push-уведомления по ночам"></toggle-row>
+        <toggle-row label="Push-уведомления"></toggle-row></div>`;
+    }
+  });
+  customElements.define('app-shell', class extends HTMLElement {
+    connectedCallback() {
+      this.attachShadow({ mode: 'open' }).innerHTML = `${style}<h2>Настройки</h2><settings-panel></settings-panel>`;
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Интернет-магазин из трёх экранов: каталог → корзина → оформление. Купи <b>два «iPhone 17»</b>
+  (не Pro!):</p>
+<ol>
+  <li>В каталоге добавь «iPhone 17» в корзину.</li>
+  <li>Открой корзину, поставь количество <b>2</b> и проверь «Итого: 199980 ₽».</li>
+  <li>Нажми «Оформить заказ», заполни: имя <code>Тест Тестов</code>, адрес <code>Казань, ул. Баумана, 1</code>,
+    способ оплаты — «Картой онлайн».</li>
+  <li>Подтверди заказ и проверь, что появился заголовок «Спасибо за заказ!» и в сводке «iPhone 17 × 2».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Карточки каталога — элементы списка. «iPhone 17» — подстрока «iPhone 17 Pro», поэтому фильтруй по точному тексту:
+  <code>filter(has=page.get_by_text("iPhone 17", exact=True))</code>.</p>
+<p>Количество — поле <code>input type="number"</code> с подписью «Количество»: <code>fill("2")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<header class="row" style="justify-content: space-between; margin-bottom: 16px">
+  <b>📱 PhoneShop</b>
+  <button id="cart-btn">Корзина (0)</button>
+</header>
+
+<section id="catalog-view">
+  <h2>Каталог</h2>
+  <ul class="plain grid" id="catalog"></ul>
+</section>
+
+<section id="cart-view" class="hidden panel stack">
+  <h2>Корзина</h2>
+  <table><thead><tr><th>Товар</th><th>Цена</th><th>Кол-во</th><th>Сумма</th></tr></thead><tbody id="cart-rows"></tbody></table>
+  <p><b id="total"></b></p>
+  <div class="row"><button id="back">← В каталог</button><button class="primary" id="checkout">Оформить заказ</button></div>
+</section>
+
+<form id="checkout-view" class="hidden panel" style="max-width: 420px">
+  <h2>Оформление</h2>
+  <div class="field"><label for="name">Имя получателя</label><input id="name"></div>
+  <div class="field"><label for="addr">Адрес доставки</label><input id="addr"></div>
+  <fieldset style="border:0; padding:0; margin-bottom: 12px">
+    <legend class="muted">Способ оплаты</legend>
+    <label class="inline"><input type="radio" name="pay" value="card"> Картой онлайн</label>
+    <label class="inline"><input type="radio" name="pay" value="cash"> Наличными курьеру</label>
+  </fieldset>
+  <p class="error" id="checkout-err"></p>
+  <button class="primary" type="submit">Подтвердить заказ</button>
+</form>
+
+<section id="done-view" class="hidden panel stack">
+  <h2>Спасибо за заказ!</h2>
+  <p id="order-num"></p>
+  <ul id="summary"></ul>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+  const products = [
+    { id: 'ip17', name: 'iPhone 17', price: 99990 },
+    { id: 'ip17pro', name: 'iPhone 17 Pro', price: 129990 },
+    { id: 's26', name: 'Galaxy S26', price: 89990 },
+    { id: 'px10', name: 'Pixel 10', price: 79990 },
+  ];
+  const cart = {};
+  const views = ['catalog-view', 'cart-view', 'checkout-view', 'done-view'];
+  const show = id => views.forEach(v => document.getElementById(v).classList.toggle('hidden', v !== id));
+  const count = () => Object.values(cart).reduce((s, q) => s + q, 0);
+  const total = () => Object.entries(cart).reduce((s, [id, q]) => s + products.find(p => p.id === id).price * q, 0);
+
+  products.forEach(p => {
+    const li = document.createElement('li');
+    li.className = 'card stack';
+    li.innerHTML = `<b>${p.name}</b><span class="muted">${p.price} ₽</span><button>В корзину</button>`;
+    li.querySelector('button').addEventListener('click', () => {
+      cart[p.id] = (cart[p.id] || 0) + 1;
+      document.getElementById('cart-btn').textContent = `Корзина (${count()})`;
+    });
+    document.getElementById('catalog').appendChild(li);
+  });
+
+  function renderCart() {
+    const rows = document.getElementById('cart-rows');
+    rows.innerHTML = '';
+    Object.entries(cart).forEach(([id, q]) => {
+      const p = products.find(x => x.id === id);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.name}</td><td>${p.price} ₽</td>
+        <td><input type="number" min="0" value="${q}" aria-label="Количество" style="min-width:0; width:70px"></td>
+        <td>${p.price * q} ₽</td>`;
+      tr.querySelector('input').addEventListener('input', e => {
+        const v = parseInt(e.target.value, 10);
+        if (Number.isNaN(v)) return;
+        if (v <= 0) delete cart[id]; else cart[id] = v;
+        document.getElementById('cart-btn').textContent = `Корзина (${count()})`;
+        tr.lastElementChild.textContent = `${p.price * Math.max(v, 0)} ₽`;
+        document.getElementById('total').textContent = `Итого: ${shownTotal()} ₽`;
+      });
+      rows.appendChild(tr);
+    });
+    document.getElementById('total').textContent = `Итого: ${shownTotal()} ₽`;
+  }
+  const shownTotal = () => Lab.mutant === 'wrong-total'
+    ? Object.keys(cart).reduce((s, id) => s + products.find(p => p.id === id).price, 0)
+    : total();
+
+  document.getElementById('cart-btn').addEventListener('click', () => { renderCart(); show('cart-view'); });
+  document.getElementById('back').addEventListener('click', () => show('catalog-view'));
+  document.getElementById('checkout').addEventListener('click', () => {
+    if (!count()) return;
+    show('checkout-view');
+  });
+  document.getElementById('checkout-view').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const addr = document.getElementById('addr').value.trim();
+    const pay = document.querySelector('[name=pay]:checked');
+    const err = document.getElementById('checkout-err');
+    if (!name || !addr || !pay) { err.textContent = 'Заполните все поля'; return; }
+    show('done-view');
+    document.getElementById('order-num').textContent = `Заказ №${Lab.rand(100000, 999999)} — ${pay.value === 'card' ? 'оплачен картой' : 'оплата курьеру'}`;
+    document.getElementById('summary').innerHTML = Object.entries(cart)
+      .map(([id, q]) => `<li>${products.find(p => p.id === id).name} × ${Lab.mutant === 'summary-qty' ? 1 : q}</li>`).join('');
+    const ok = JSON.stringify(cart) === JSON.stringify({ ip17: 2 }) && pay.value === 'card'
+      && name === 'Тест Тестов' && addr === 'Казань, ул. Баумана, 1';
+    if (ok) Lab.success('Заказ оформлен правильно');
+    else Lab.fail('Заказ оформлен, но не тот: проверь товары, количество, данные и оплату');
+  });
+</script>
+{% endblock %}

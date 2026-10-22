@@ -1,0 +1,46 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p><b>Спецификация:</b> в каталоге 23 товара — «Товар 1» … «Товар 23». Они показываются по 5 на странице, по порядку, каждый
+  ровно один раз. Кнопка «Следующая» становится неактивной на последней странице.</p>
+<p>Напиши тест, который пролистывает все страницы и сверяет полный список товаров со спецификацией.
+  На текущей версии он должен упасть, на исправленной — пройти.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Собирай названия в список, пока кнопка «Следующая» активна, и в конце сравни со списком из спецификации:</p>
+<pre><code>expected = [f"Товар {i}" for i in range(1, 24)]
+assert collected == expected</code></pre>
+<p>Сравнение с полным списком ловит сразу всё: дубли, пропуски и нарушенный порядок. После клика дожидайся смены
+  номера страницы, а не просто читай строки.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 360px">
+  <ul id="list" aria-label="Каталог"></ul>
+  <div class="row">
+    <button id="prev">Предыдущая</button>
+    <span data-testid="page-number" id="page"></span>
+    <button id="next">Следующая</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const ITEMS = Array.from({ length: 23 }, (_, i) => `Товар ${i + 1}`);
+  const SIZE = 5, PAGES = Math.ceil(ITEMS.length / SIZE);
+  let page = 0;
+  function render() {
+    // БАГ: со второй страницы начало сдвинуто на один элемент назад
+    const start = page * SIZE - (Lab.mutant === 'fixed' || page === 0 ? 0 : 1);
+    document.getElementById('list').innerHTML = ITEMS.slice(start, start + SIZE).map(t => `<li>${t}</li>`).join('');
+    document.getElementById('page').textContent = `Страница ${page + 1} из ${PAGES}`;
+    document.getElementById('prev').disabled = page === 0;
+    document.getElementById('next').disabled = page === PAGES - 1;
+  }
+  document.getElementById('prev').addEventListener('click', () => { page--; render(); });
+  document.getElementById('next').addEventListener('click', () => { page++; render(); });
+  render();
+</script>
+{% endblock %}

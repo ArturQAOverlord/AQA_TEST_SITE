@@ -1,0 +1,39 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p><b>Спецификация:</b> пароль допустим, если его длина <b>от 8 до 20 символов включительно</b>. Допустимый пароль —
+  сообщение «Пароль подходит», иначе — «Длина пароля должна быть от 8 до 20 символов».</p>
+<p>Найди баг тестом. Подсказка из теории тестирования: ошибки чаще всего живут на <b>границах</b> диапазона.
+  Тест должен упасть на текущей версии и пройти на исправленной.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Граничные значения для диапазона 8–20: 7 и 8 на нижней границе, 20 и 21 — на верхней.
+  Удобно сделать это одним параметризованным тестом:</p>
+<pre><code>@pytest.mark.parametrize(("length", "valid"), [(7, False), (8, True), (20, True), (21, False)])
+def test_bug_boundary(page: Page, length: int, valid: bool):
+    ...</code></pre>
+{% endblock %}
+
+{% block content %}
+<form class="panel stack" style="max-width: 420px" id="form">
+  <h3>Новый пароль</h3>
+  <div class="field"><label for="pwd">Пароль</label><input id="pwd" type="text" autocomplete="off"></div>
+  <button class="primary" type="submit">Проверить</button>
+  <p role="alert" id="msg"></p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const len = document.getElementById('pwd').value.length;
+    // БАГ: верхняя граница не включена (должно быть <=)
+    const ok = len >= 8 && (Lab.mutant === 'fixed' ? len <= 20 : len < 20);
+    const msg = document.getElementById('msg');
+    msg.className = ok ? 'ok' : 'error';
+    msg.textContent = ok ? 'Пароль подходит' : 'Длина пароля должна быть от 8 до 20 символов';
+  });
+</script>
+{% endblock %}

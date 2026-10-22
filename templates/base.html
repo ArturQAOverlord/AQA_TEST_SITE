@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AQA Lab{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="{{ url_for('index') }}"><span class="logo-mark">▶</span> AQA Lab</a>
+    <nav class="topnav">
+      <a href="{{ url_for('index') }}#tracks">Треки</a>
+      <a href="{{ url_for('index') }}#catalog">Миссии</a>
+      <a href="{{ url_for('cheatsheet') }}">Шпаргалка</a>
+      <a href="{{ url_for('index') }}#how">Как пользоваться</a>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">AQA Lab · Playwright + pytest + Python · тренажёр для автотестеров</footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

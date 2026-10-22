@@ -1,0 +1,48 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Заполни анкету и отправь её:</p>
+<ul>
+  <li>Имя — <code>Иван</code></li>
+  <li>Фамилия — <code>Петров</code></li>
+  <li>Email — <code>ivan@test.ru</code></li>
+  <li>Отметь чекбокс «Согласен на обработку данных»</li>
+  <li>Нажми «Отправить»</li>
+</ul>
+<p>У полей нет ни <code>name</code>, ни осмысленных <code>id</code>, зато есть подписи <code>&lt;label&gt;</code>.
+  Ищи поля по ним.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>page.get_by_label("Имя").fill("Иван")</code>. Для чекбокса — <code>.check()</code>.
+  Label работает и через атрибут <code>for</code>, и когда input вложен прямо в label, и через <code>aria-label</code>.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="form" style="max-width: 420px" novalidate>
+  <h2>Анкета участника</h2>
+  <div class="field"><label for="f1">Имя</label><input id="f1"></div>
+  <div class="field"><label for="f2">Фамилия</label><input id="f2"></div>
+  <div class="field"><label for="f3">Email</label><input id="f3" type="email"></div>
+  <div class="field"><label class="inline"><input type="checkbox" id="f4"> Согласен на обработку данных</label></div>
+  <button class="primary" type="submit">Отправить</button>
+  <p class="error" id="err"></p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = id => document.getElementById(id).value.trim();
+    const errors = [];
+    if (v('f1') !== 'Иван') errors.push('имя');
+    if (v('f2') !== 'Петров') errors.push('фамилия');
+    if (v('f3') !== 'ivan@test.ru') errors.push('email');
+    if (!document.getElementById('f4').checked) errors.push('согласие');
+    document.getElementById('err').textContent = errors.length ? 'Проверь: ' + errors.join(', ') : '';
+    if (errors.length) Lab.fail('Неверно заполнено: ' + errors.join(', '));
+    else Lab.success('Анкета отправлена');
+  });
+</script>
+{% endblock %}

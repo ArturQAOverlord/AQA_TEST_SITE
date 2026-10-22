@@ -1,0 +1,46 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>После сохранения настроек в углу всплывает уведомление и через пару секунд исчезает.</p>
+<ol>
+  <li>Нажми «Сохранить».</li>
+  <li>Проверь, что появилось уведомление (<code>role="status"</code>) с текстом ровно <b>«Изменения сохранены»</b>.</li>
+  <li>Проверь, что оно <b>исчезло</b> само.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Обе проверки web-first, они сами подождут:</p>
+<pre><code>toast = page.get_by_role("status")
+expect(toast).to_have_text("Изменения сохранены")
+expect(toast).to_be_hidden()</code></pre>
+<p>Уведомление живёт ~2 секунды, то есть укладывается в стандартный таймаут 5 секунд.
+  Не проверяй исчезновение через <code>assert not toast.is_visible()</code> — это мгновенный снимок, а не ожидание.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 400px">
+  <h3>Профиль</h3>
+  <div class="field"><label for="nick">Никнейм</label><input id="nick" value="tester"></div>
+  <button class="primary" id="save">Сохранить</button>
+</div>
+<div id="toasts" style="position: fixed; top: 16px; right: 16px"></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('save').addEventListener('click', async () => {
+    await Lab.sleep(300);
+    const t = document.createElement('div');
+    t.setAttribute('role', 'status');
+    t.className = 'card';
+    t.style.background = '#1f2430';
+    t.style.color = '#fff';
+    t.textContent = Lab.mutant === 'toast-text' ? 'Изменения сохраненны' : 'Изменения сохранены';
+    document.getElementById('toasts').appendChild(t);
+    Lab.success('Настройки сохранены — проверь уведомление');
+    await Lab.sleep(2000);
+    if (Lab.mutant !== 'toast-stays') t.remove();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "play.html" %}
+
+{% block title %}{{ "Профиль | Личный кабинет" if mutant == "wrong-initial-title" else "Профиль — Личный кабинет" }}{% endblock %}
+
+{% block brief %}
+<p>Личный кабинет с вкладками. Вкладки меняют адрес страницы (<code>?tab=...</code>) и заголовок окна (<code>&lt;title&gt;</code>).</p>
+<ol>
+  <li>Проверь, что заголовок страницы — «Профиль — Личный кабинет».</li>
+  <li>Перейди на вкладку «Настройки».</li>
+  <li>Проверь, что URL заканчивается на <code>?tab=settings</code>, а заголовок — «Настройки — Личный кабинет».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>expect(page).to_have_title("Профиль — Личный кабинет")
+expect(page).to_have_url(re.compile(r"\?tab=settings$"))</code></pre>
+<p>Проверки страницы вызываются на самом <code>page</code>, а не на локаторе.</p>
+{% endblock %}
+
+{% block content %}
+<nav class="row" style="margin-bottom: 16px" role="tablist">
+  <a href="?tab=profile" data-tab="profile" role="tab">Профиль</a>
+  <a href="?tab=orders" data-tab="orders" role="tab">Заказы</a>
+  <a href="?tab=settings" data-tab="settings" role="tab">Настройки</a>
+</nav>
+<div class="panel" id="content"></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const tabs = { profile: 'Профиль', orders: 'Заказы', settings: 'Настройки' };
+  function show(tab, initial) {
+    if (!initial && Lab.mutant !== 'title-stale') document.title = `${tabs[tab]} — Личный кабинет`;
+    document.getElementById('content').innerHTML = `<h3>${tabs[tab]}</h3><p class="muted">Содержимое вкладки «${tabs[tab]}»</p>`;
+    document.querySelectorAll('[data-tab]').forEach(a => a.setAttribute('aria-selected', String(a.dataset.tab === tab)));
+  }
+  document.querySelectorAll('[data-tab]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    if (Lab.mutant !== 'url-stale') history.pushState({}, '', '?tab=' + a.dataset.tab);
+    show(a.dataset.tab);
+    // Засчитывается только переход кликом: прямой goto("?tab=settings") не считается
+    if (a.dataset.tab === 'settings') Lab.success('Открыты настройки — проверь URL и title');
+  }));
+  const initialTab = new URLSearchParams(location.search).get('tab');
+  show(initialTab in tabs ? initialTab : 'profile', true);
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Платёжный виджет встроен iframe'ом <code>title="Платёжный виджет"</code>, а поле номера карты внутри него —
+  ещё одним iframe'ом <code>title="Ввод карты"</code> (так делают настоящие платёжные системы).</p>
+<p>Введи номер <code>4242 4242 4242 4242</code> во вложенный фрейм и нажми «Оплатить 990 ₽», которая лежит во
+  внешнем фрейме.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>widget = page.frame_locator('iframe[title="Платёжный виджет"]')
+card = widget.frame_locator('iframe[title="Ввод карты"]')
+card.get_by_label("Номер карты").fill(...)
+widget.get_by_role("button", name="Оплатить 990 ₽").click()</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <h2>Оформление подписки</h2>
+  <p>Подписка «Pro» на месяц — 990 ₽</p>
+  <iframe title="Платёжный виджет" src="{{ url_for('playground_subpage', slug=mission.slug, page='outer') }}"
+          style="width:100%; height:260px; border:1px dashed #9aa5bd; border-radius:12px; background:#fff"></iframe>
+</div>
+{% endblock %}

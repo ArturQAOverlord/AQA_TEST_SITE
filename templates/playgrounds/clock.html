@@ -1,0 +1,54 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Новогодняя акция: страница показывает обратный отсчёт до <b>1 января 2027, 00:00</b> (по местному времени), а после
+  полуночи — поздравление и кнопку «Получить подарок».</p>
+<ol>
+  <li>Установи время браузера на <b>31 декабря 2026, 23:59:00</b> и останови его.</li>
+  <li>Проверь, что отсчёт показывает «До Нового года: 0д 0ч 1м 0с».</li>
+  <li>Перемотай время на минуту вперёд, проверь надпись «С Новым годом!» и нажми «Получить подарок».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.clock.install(time=datetime(2026, 12, 31, 23, 58, 0))
+page.goto("/play/clock")
+page.clock.pause_at(datetime(2026, 12, 31, 23, 59, 0))
+...
+page.clock.fast_forward("01:00")</code></pre>
+<p><code>install()</code> подменяет <code>Date</code>, <code>setTimeout</code>, <code>setInterval</code> и т.п. — его вызывают
+  <b>до</b> загрузки страницы. <code>pause_at</code> останавливает время, <code>fast_forward</code> прыгает вперёд и запускает
+  накопившиеся таймеры. Наивный <code>datetime</code> трактуется как локальное время — как и в браузере.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px; text-align: center">
+  <h2 id="headline">🎄 Скоро Новый год</h2>
+  <p data-testid="countdown" id="countdown"></p>
+  <button class="primary hidden" id="gift">Получить подарок</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const NY = new Date(2027, 0, 1, 0, 0, 0).getTime();
+  function tick() {
+    const left = NY - Date.now();
+    if (left <= 0) {
+      document.getElementById('headline').textContent = '🎉 С Новым годом!';
+      document.getElementById('countdown').textContent = '';
+      document.getElementById('gift').classList.remove('hidden');
+      return;
+    }
+    const s = Math.floor(left / 1000);
+    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+    document.getElementById('countdown').textContent = `До Нового года: ${d}д ${h}ч ${m}м ${sec}с`;
+  }
+  tick();
+  setInterval(tick, 1000);
+  document.getElementById('gift').addEventListener('click', () => {
+    if (Date.now() < NY) return Lab.fail('Новый год ещё не наступил');
+    Lab.success('Подарок получен 🎁');
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Логиниться через форму в каждом тесте — медленно. Обычный приём: войти один раз, сохранить состояние браузера
+  (cookies + localStorage) в файл и переиспользовать его в других тестах.</p>
+<ol>
+  <li>Открой страницу и войди: <code>student</code> / <code>playwright123</code>. Сессия хранится в httpOnly-cookie.</li>
+  <li>Сохрани состояние контекста в файл: <code>page.context.storage_state(path=...)</code>.</li>
+  <li>Создай <b>новый</b> контекст из этого файла, открой в нём страницу — должен сразу открыться кабинет без формы входа.</li>
+  <li>В новом контексте нажми «Мои курсы».</li>
+</ol>
+<p>Засчитывается, только если кабинет открылся сразу, без входа на этой вкладке.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>def test_storage_state(page: Page, browser: Browser, base_url: str, tmp_path):
+    ...  # вход через форму
+    state = tmp_path / "state.json"
+    page.context.storage_state(path=state)
+
+    context = browser.new_context(storage_state=state, base_url=base_url)
+    new_page = context.new_page()
+    ...
+    context.close()</code></pre>
+<p>В реальных проектах вход выносят в session-фикстуру, а <code>browser_context_args</code> подкладывает
+  <code>storage_state</code> во все тесты.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 380px" id="box"><span class="spinner"></span></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const box = document.getElementById('box');
+  let loggedHere = false;
+  try { loggedHere = sessionStorage.getItem('lab-logged-here') === '1'; } catch {}
+  function showLogin() {
+    box.innerHTML = `<h3>Вход</h3>
+      <div class="field"><label for="u">Логин</label><input id="u"></div>
+      <div class="field"><label for="p">Пароль</label><input id="p" type="password"></div>
+      <p class="error" id="err"></p>
+      <button class="primary" id="login">Войти</button>`;
+    document.getElementById('login').addEventListener('click', async () => {
+      const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value }) });
+      if (!r.ok) { document.getElementById('err').textContent = 'Неверный логин или пароль'; return; }
+      try { sessionStorage.setItem('lab-logged-here', '1'); } catch {}
+      loggedHere = true;
+      showCabinet('student', false);
+    });
+  }
+  function showCabinet(user, fresh) {
+    box.innerHTML = `<h3>Личный кабинет</h3><p>Вы вошли как <b>${user}</b></p><button class="primary" id="courses">Мои курсы</button>`;
+    document.getElementById('courses').addEventListener('click', () => {
+      if (!fresh || loggedHere) return Lab.fail('кабинет открыт после входа на этой вкладке — нужен новый контекст со storage_state');
+      Lab.success('Сессия перенесена через storage_state');
+    });
+  }
+  fetch('/api/me').then(async r => {
+    if (r.ok) showCabinet((await r.json()).username, true);
+    else showLogin();
+  });
+</script>
+{% endblock %}

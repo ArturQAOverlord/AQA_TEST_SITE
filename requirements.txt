@@ -1,0 +1,8 @@
+flask>=3.0
+flask-sock>=0.7
+pytest>=8.0
+pytest-playwright>=0.5
+playwright>=1.49
+pytest-xdist>=3.5
+allure-pytest>=2.13
+pillow>=10.0

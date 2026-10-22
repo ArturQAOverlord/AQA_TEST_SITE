@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Трек «{{ track.title }}» — AQA Lab{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('index') }}#tracks">Треки</a> / {{ track.title }}</div>
+<h1>{{ track.title }}</h1>
+<p class="lead">{{ track.description }}</p>
+{% set done = track.slugs | select('in', progress) | list | length %}
+<div class="progress-box">
+  <div class="progress-label"><b>{{ done }} / {{ track.slugs | length }}</b> пройдено</div>
+  <div class="progress-bar"><div class="progress-fill" style="width: {{ (done / (track.slugs | length) * 100) | round(1) }}%"></div></div>
+</div>
+{% set ns = namespace(next=None) %}
+{% for slug in track.slugs %}{% if ns.next is none and slug not in progress %}{% set ns.next = slug %}{% endif %}{% endfor %}
+{% if ns.next %}
+<p><a class="btn-primary" href="{{ url_for('mission_page', slug=ns.next) }}">Продолжить: {{ missions_by_slug[ns.next].title }} →</a></p>
+{% else %}
+<p class="done-mark">Трек пройден целиком 🎉</p>
+{% endif %}
+
+<ol class="track-list">
+  {% for slug in track.slugs %}
+  {% set m = missions_by_slug[slug] %}
+  {% set v = verified.get(slug) %}
+  <li class="{% if slug in progress %}done{% endif %} {% if slug == ns.next %}current{% endif %}">
+    <span class="track-step">{{ "✓" if slug in progress else loop.index }}</span>
+    <a href="{{ url_for('mission_page', slug=slug) }}">{{ m.title }}</a>
+    <span class="level level-{{ m.level | lower }}">{{ m.level }}</span>
+    <span class="muted">{{ m.summary }}</span>
+    {% if v and not v.ok %}<span class="warn-mark">⚠ проверка</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endblock %}

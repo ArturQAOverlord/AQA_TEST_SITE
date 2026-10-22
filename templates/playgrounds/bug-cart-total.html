@@ -1,0 +1,49 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p><b>Спецификация корзины:</b></p>
+<ul>
+  <li>Цена «Носков с котиками» — 300 ₽ за пару.</li>
+  <li>При количестве <b>от 10 пар</b> на всю позицию действует скидка <b>15%</b>.</li>
+  <li>Итог округляется до целого рубля.</li>
+</ul>
+<p>Где-то в расчёте есть баг. Напиши тест, который проверяет правило скидки (и до порога, и после).
+  На текущей версии страницы тест должен <b>упасть</b>, а на исправленной — <b>пройти</b>.</p>
+<p>Миссия засчитывается проверкой «Запустить проверку» на этой странице.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Посчитай ожидаемые суммы по спецификации заранее: 9 пар — 2700 ₽, 10 пар — 3000 × 0,85 = 2550 ₽, 20 пар — 5100 ₽.
+  Сравнивай с тем, что показывает страница, через <code>to_have_text</code>.</p>
+<p>Тест на баг — это обычный тест на требование. Он не знает, где ошибка, — он просто проверяет, как должно быть.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Корзина</h3>
+  <div class="row" style="justify-content: space-between">
+    <span>🧦 Носки с котиками — 300 ₽</span>
+    <label class="inline">Количество <input type="number" id="qty" min="1" value="1" style="min-width:0; width:80px"></label>
+  </div>
+  <p class="muted" id="discount"></p>
+  <p><b data-testid="total" id="total"></b></p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const PRICE = 300;
+  function update() {
+    const qty = Math.max(0, parseInt(document.getElementById('qty').value, 10) || 0);
+    let total = PRICE * qty;
+    if (qty >= 10) {
+      total *= 0.85;
+      if (Lab.mutant !== 'fixed') total *= 0.85;  // БАГ: скидка применяется дважды
+    }
+    document.getElementById('discount').textContent = qty >= 10 ? 'Скидка 15% за опт' : 'Скидка от 10 пар';
+    document.getElementById('total').textContent = `Итого: ${Math.round(total)} ₽`;
+  }
+  document.getElementById('qty').addEventListener('input', update);
+  update();
+</script>
+{% endblock %}

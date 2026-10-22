@@ -1,0 +1,44 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Корпоративный поиск жёстко настроен: поле заблокировано со значением <code>selenium</code>, и кнопка «Найти»
+  отправляет <code>GET /api/search?q=selenium</code>.</p>
+<p>Не трогая поле, сделай так, чтобы на сервер ушёл запрос с <code>q=playwright</code>, и проверь, что в результатах
+  ровно один пункт — «Playwright».</p>
+<p>Подделать ответ через <code>fulfill</code> не выйдет: страница сверяет результат с заголовком ответа
+  <code>X-Lab-Query</code>, который ставит настоящий сервер.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>def swap_query(route):
+    url = route.request.url.replace("q=selenium", "q=playwright")
+    route.continue_(url=url)
+
+page.route("**/api/search*", swap_query)</code></pre>
+<p><code>continue_()</code> умеет менять <code>url</code>, <code>method</code>, <code>headers</code> и <code>post_data</code>.
+  Менять можно только адрес на том же протоколе — подменить запрос на совсем другой хост так нельзя.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <div class="row">
+    <input value="selenium" readonly aria-label="Запрос">
+    <button class="primary" id="go">Найти</button>
+  </div>
+  <ul id="results" aria-label="Результаты"></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('go').addEventListener('click', async () => {
+    const r = await fetch('/api/search?q=selenium');
+    const items = await r.json();
+    document.getElementById('results').innerHTML = items.map(i => `<li>${i}</li>`).join('');
+    const realQuery = r.headers.get('X-Lab-Query');
+    if (realQuery === 'playwright' && items.join() === 'Playwright') Lab.success('Запрос подменён');
+    else if (realQuery === 'selenium') Lab.fail('ушёл исходный запрос selenium');
+    else Lab.fail('ответ не от настоящего сервера или запрос подменён не так');
+  });
+</script>
+{% endblock %}

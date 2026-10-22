@@ -1,0 +1,63 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Мессенджер, которым удобно пользоваться с клавиатуры. Выполни три шага:</p>
+<ol>
+  <li>Отправь сообщение <code>Привет</code> клавишей <kbd>Enter</kbd> (кнопки отправки нет).</li>
+  <li>Открой «Настройки» и закрой окно клавишей <kbd>Escape</kbd> (кнопки закрытия тоже нет).</li>
+  <li>Открой палитру команд сочетанием <kbd>Control</kbd>+<kbd>K</kbd>.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p><code>locator.press("Enter")</code> нажимает клавишу на конкретном элементе,
+  <code>page.keyboard.press("Escape")</code> — там, где сейчас фокус. Сочетания пишутся через плюс:
+  <code>"Control+K"</code>. На macOS для кроссплатформенности есть <code>"ControlOrMeta+K"</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 520px">
+  <div class="row" style="justify-content: space-between">
+    <h3 style="margin:0">Чат</h3>
+    <button id="settings">Настройки</button>
+  </div>
+  <ul class="plain" id="messages" aria-label="Сообщения"></ul>
+  <input id="msg" placeholder="Сообщение…" style="width: 100%">
+  <ul class="plain muted" id="steps" style="font-size: 13px">
+    <li data-step="send">○ сообщение отправлено</li>
+    <li data-step="esc">○ настройки закрыты Escape</li>
+    <li data-step="palette">○ палитра команд открыта</li>
+  </ul>
+</div>
+<div class="overlay hidden" id="modal"><div class="modal" role="dialog" aria-label="Настройки"><h3>Настройки</h3><p>Закрой меня клавишей Escape</p></div></div>
+<div class="overlay hidden" id="palette"><div class="modal" role="dialog" aria-label="Палитра команд"><input placeholder="Введите команду…"></div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const done = new Set();
+  function mark(step) {
+    done.add(step);
+    document.querySelector(`[data-step="${step}"]`).textContent = '● ' + document.querySelector(`[data-step="${step}"]`).textContent.slice(2);
+    if (done.size === 3) Lab.success('Клавиатура освоена');
+  }
+  document.getElementById('msg').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const li = document.createElement('li');
+    li.textContent = e.target.value;
+    document.getElementById('messages').appendChild(li);
+    if (e.target.value.trim() === 'Привет') mark('send');
+    e.target.value = '';
+  });
+  const modal = document.getElementById('modal');
+  document.getElementById('settings').addEventListener('click', () => modal.classList.remove('hidden'));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) { modal.classList.add('hidden'); mark('esc'); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      document.getElementById('palette').classList.remove('hidden');
+      mark('palette');
+    }
+  });
+</script>
+{% endblock %}

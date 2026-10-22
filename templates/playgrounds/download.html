@@ -1,0 +1,52 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Кнопка «Скачать отчёт» генерирует CSV-файл с результатами прогона. В последней строке файла —
+  контрольная сумма, на странице её нет.</p>
+<ol>
+  <li>Скачай файл и проверь, что его имя имеет вид <code>report-&lt;цифры&gt;.csv</code>.</li>
+  <li>Прочитай файл, найди строку <code>checksum,…</code> и введи значение в поле «Контрольная сумма».</li>
+  <li>Нажми «Проверить».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>with page.expect_download() as download_info:
+    page.get_by_role("button", name="Скачать отчёт").click()
+download = download_info.value
+assert re.fullmatch(r"report-\d+\.csv", download.suggested_filename)
+text = Path(download.path()).read_text(encoding="utf-8")</code></pre>
+<p>Файл можно и сохранить куда нужно: <code>download.save_as(tmp_path / download.suggested_filename)</code>
+  — фикстура <code>tmp_path</code> есть в pytest из коробки.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Отчёт о прогоне</h3>
+  <button id="dl">Скачать отчёт</button>
+  <div class="field"><label for="sum">Контрольная сумма</label><input id="sum"></div>
+  <button class="primary" id="check">Проверить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const checksum = Array.from({ length: 8 }, () => '0123456789abcdef'[Lab.rand(0, 15)]).join('');
+  let downloaded = false;
+  document.getElementById('dl').addEventListener('click', () => {
+    const rows = ['test,result,duration'];
+    for (let i = 1; i <= 5; i++) rows.push(`test_case_${i},${Math.random() < .8 ? 'passed' : 'failed'},${Lab.rand(100, 2000)}ms`);
+    rows.push('checksum,' + checksum);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+    a.download = `report-${Date.now()}.csv`;
+    Lab.internal(() => a.click());
+    downloaded = true;
+  });
+  document.getElementById('check').addEventListener('click', () => {
+    if (!downloaded) return Lab.fail('отчёт ещё не скачивали');
+    if (document.getElementById('sum').value.trim() === checksum) Lab.success('Контрольная сумма совпала');
+    else Lab.fail('контрольная сумма не совпала');
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Полный сценарий авторизации. Учётка: <code>admin</code> / <code>secret</code>.</p>
+<ol>
+  <li>Нажми «Войти» с пустыми полями — проверь ошибку «Введите логин».</li>
+  <li>Введи <code>admin</code> и неверный пароль — проверь ошибку «Неверный логин или пароль».</li>
+  <li>Войди с правильным паролем — проверь заголовок «Добро пожаловать, admin!».</li>
+  <li>Нажми «Выйти» — проверь, что снова видна форма входа, а поле пароля пустое.</li>
+</ol>
+<p>Сервер «думает» над логином около секунды.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Сценарий длинный — удобно вынести вход в функцию-хелпер:</p>
+<pre><code>def login(page, username, password):
+    page.get_by_label("Логин").fill(username)
+    page.get_by_label("Пароль").fill(password)
+    page.get_by_role("button", name="Войти").click()</code></pre>
+<p>В настоящих проектах такие хелперы превращаются в Page Object.</p>
+<p>Ловушка: <code>get_by_role("heading", name="Добро пожаловать, admin!")</code> найдёт и «Добро пожаловать, Admin!» —
+  без <code>exact=True</code> имя сравнивается без учёта регистра. Для проверки текста надёжнее
+  <code>expect(...).to_have_text(...)</code>: строковое сравнение там регистрозависимое.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="login" style="max-width: 360px" novalidate>
+  <h2>Вход в систему</h2>
+  <div class="field"><label for="u">Логин</label><input id="u"></div>
+  <div class="field"><label for="p">Пароль</label><input id="p" type="password"></div>
+  <p class="error" role="alert" id="err"></p>
+  <button class="primary" type="submit" id="submit">Войти</button>
+</form>
+<div class="panel stack hidden" id="dash" style="max-width: 360px">
+  <h2 id="hello"></h2>
+  <p class="muted">У вас 3 новых уведомления.</p>
+  <button id="logout">Выйти</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const seen = new Set();
+  const form = document.getElementById('login');
+  const err = document.getElementById('err');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const u = document.getElementById('u').value.trim();
+    const p = document.getElementById('p').value;
+    err.textContent = '';
+    if (!u) { err.textContent = 'Введите логин'; seen.add('empty'); return; }
+    const btn = document.getElementById('submit');
+    btn.disabled = true; btn.textContent = 'Проверяем…';
+    await Lab.sleep(Lab.rand(700, 1200));
+    btn.disabled = false; btn.textContent = 'Войти';
+    if (u !== 'admin' || p !== 'secret') { err.textContent = 'Неверный логин или пароль'; seen.add('wrong'); return; }
+    seen.add('login');
+    form.classList.add('hidden');
+    document.getElementById('hello').textContent = Lab.mutant === 'wrong-greeting' ? 'Добро пожаловать, Admin!' : `Добро пожаловать, ${u}!`;
+    document.getElementById('dash').classList.remove('hidden');
+  });
+  document.getElementById('logout').addEventListener('click', () => {
+    document.getElementById('dash').classList.add('hidden');
+    if (Lab.mutant !== 'password-kept') document.getElementById('p').value = '';
+    form.classList.remove('hidden');
+    if (['empty', 'wrong', 'login'].every(s => seen.has(s))) Lab.success('Сценарий авторизации пройден целиком');
+    else Lab.fail('Пропущены шаги с ошибками');
+  });
+</script>
+{% endblock %}

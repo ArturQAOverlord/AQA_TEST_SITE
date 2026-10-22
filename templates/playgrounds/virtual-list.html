@@ -1,0 +1,52 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Справочник на 10 000 пользователей. Чтобы страница не тормозила, список <b>виртуализирован</b>: в DOM живут только
+  строки, которые сейчас видны (плюс небольшой запас). Все строки одинаковой высоты — 32 px.</p>
+<p>Найди пользователя, указанного над списком (номер случайный), и нажми «Открыть» в его строке.</p>
+<p><code>click()</code> сам прокручивает к элементу, только если элемент уже есть в DOM. Здесь его нет, пока не доскроллишь.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Раз высота строк известна, можно сразу прыгнуть к нужному месту:</p>
+<pre><code>users = page.get_by_role("list", name="Пользователи")
+users.evaluate("(el, top) => el.scrollTop = top", (number - 1) * 32)</code></pre>
+<p>Если высоты неизвестны — крути колесом над списком (<code>users.hover()</code>, затем <code>page.mouse.wheel(0, 3000)</code>), пока строка не появится.
+  И не забудь про <code>exact=True</code>: «Пользователь #734» — подстрока «Пользователь #7342».</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 460px">
+  <p>Найди: <b data-testid="target" id="target"></b></p>
+  <div role="list" aria-label="Пользователи" id="viewport" style="height: 400px; overflow-y: auto; position: relative; border: 1px solid #dde2ec; border-radius: 8px">
+    <div id="spacer" style="position: relative"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const TOTAL = 10000, ROW = 32, BUFFER = 5;
+  const target = Lab.rand(4000, 9800);
+  document.getElementById('target').textContent = `Пользователь #${target}`;
+  const viewport = document.getElementById('viewport');
+  const spacer = document.getElementById('spacer');
+  spacer.style.height = TOTAL * ROW + 'px';
+  function render() {
+    const start = Math.max(0, Math.floor(viewport.scrollTop / ROW) - BUFFER);
+    const end = Math.min(TOTAL, Math.ceil((viewport.scrollTop + viewport.clientHeight) / ROW) + BUFFER);
+    spacer.innerHTML = '';
+    for (let i = start; i < end; i++) {
+      const n = i + 1;
+      const row = document.createElement('div');
+      row.setAttribute('role', 'listitem');
+      row.style.cssText = `position:absolute; top:${i * ROW}px; left:0; right:0; height:${ROW}px; display:flex; align-items:center; justify-content:space-between; padding:0 10px; border-bottom:1px solid #f0f2f6`;
+      row.innerHTML = `<span>Пользователь #${n}</span><button style="padding:2px 10px">Открыть</button>`;
+      row.querySelector('button').addEventListener('click', () => n === target ? Lab.success(`Карточка #${n} открыта`) : Lab.fail(`открыт пользователь #${n}`));
+      spacer.appendChild(row);
+    }
+  }
+  viewport.addEventListener('scroll', render);
+  render();
+</script>
+{% endblock %}

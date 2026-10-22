@@ -1,0 +1,12 @@
+<p>Перед каждым действием Playwright проверяет <b>actionability</b>: элемент есть в DOM, видим, стабилен (не анимируется),
+  получает события (ничем не перекрыт) и включён. Ждёт до таймаута действия (30 с).</p>
+<p><b>Web-first проверки</b> <code>expect(…)</code> перепроверяют условие, пока оно не выполнится или не истечёт таймаут (5 с).
+  Поэтому:</p>
+<pre><code>expect(items).to_have_count(5)        # ждёт
+assert items.count() == 5             # проверяет один раз — флейк</code></pre>
+<ul>
+  <li><code>time.sleep()</code> почти всегда ошибка: он либо слишком короткий (флейк), либо слишком длинный (медленно).</li>
+  <li>Если условие не видно в DOM — ждут события: <code>expect_response</code>, <code>expect_request</code>, <code>wait_for_url</code>,
+    в крайнем случае <code>wait_for_function</code>.</li>
+  <li><code>networkidle</code> официально не рекомендуется — ждите конкретный признак готовности.</li>
+</ul>

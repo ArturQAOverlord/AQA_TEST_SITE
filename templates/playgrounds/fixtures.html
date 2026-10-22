@@ -1,0 +1,59 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Личный кабинет студента доступен только после входа. Логиниться через форму в каждом тесте — долго и не по делу:
+  тест про курсы не должен падать из-за формы входа.</p>
+<ol>
+  <li>Напиши фикстуру <code>logged_in_page</code>, которая входит через API
+    (<code>POST /api/login</code> с <code>{"username": "student", "password": "playwright123"}</code>) и возвращает <code>page</code>.</li>
+  <li>Тест <code>test_fixtures</code> принимает эту фикстуру, открывает кабинет и нажимает «Продолжить обучение».</li>
+</ol>
+<p>Вход через форму на странице засчитывается как провал. Проверка задания разбирает код: тест должен принимать
+  собственную фикстуру, а она — ходить в <code>/api/login</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>@pytest.fixture
+def logged_in_page(page: Page) -> Page:
+    response = page.request.post("/api/login", data={...})
+    expect(response).to_be_ok()
+    return page</code></pre>
+<p><code>page.request</code> делит cookies с браузерным контекстом — сессия из ответа сразу действует и для страницы.
+  Если фикстура нужна многим файлам, перенеси её в <code>exercises/conftest.py</code>. Для очистки после теста используют
+  <code>yield</code> вместо <code>return</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 400px" id="box"><span class="spinner"></span></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const box = document.getElementById('box');
+  let loggedViaForm = false;
+  function showLogin() {
+    box.innerHTML = `<h3>Вход</h3>
+      <div class="field"><label for="u">Логин</label><input id="u"></div>
+      <div class="field"><label for="p">Пароль</label><input id="p" type="password"></div>
+      <p class="error" id="err"></p>
+      <button class="primary" id="login">Войти</button>`;
+    document.getElementById('login').addEventListener('click', async () => {
+      const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value }) });
+      if (!r.ok) { document.getElementById('err').textContent = 'Неверный логин или пароль'; return; }
+      loggedViaForm = true;
+      showCabinet('student');
+    });
+  }
+  function showCabinet(user) {
+    box.innerHTML = `<h3>Мои курсы</h3><p>Студент: <b>${user}</b></p>
+      <ul><li>Playwright с нуля — 60%</li><li>pytest для AQA — 25%</li></ul>
+      <button class="primary" id="continue">Продолжить обучение</button>`;
+    document.getElementById('continue').addEventListener('click', () => {
+      if (loggedViaForm) return Lab.fail('вход через форму — а нужно в фикстуре через API');
+      Lab.success('Кабинет открыт сразу после входа через API');
+    });
+  }
+  fetch('/api/me').then(async r => r.ok ? showCabinet((await r.json()).username) : showLogin());
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Форма подписки встроена через <code>&lt;iframe title="Подписка на рассылку"&gt;</code>.
+  Подпишись: введи email <code>student@aqa.lab</code> и нажми «Подписаться».</p>
+<p>Обычный <code>page.get_by_...</code> внутрь iframe не заглядывает.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>frame = page.frame_locator('iframe[title="Подписка на рассылку"]')
+frame.get_by_placeholder("Ваш email").fill(...)</code></pre>
+<p>Современный вариант: <code>page.get_by_title("Подписка на рассылку").content_frame</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <h2>Блог об автоматизации</h2>
+  <p>Статьи про Playwright, pytest и CI. Подпишись, чтобы не пропустить новое.</p>
+  <p>Вне iframe тоже есть кнопка «Подписаться», но это ловушка.</p>
+  <button id="outer">Подписаться</button>
+  <iframe title="Подписка на рассылку" src="{{ url_for('playground_subpage', slug=mission.slug, page='frame') }}"
+          style="width:100%; height:170px; border:1px dashed #9aa5bd; border-radius:12px; background:#fff"></iframe>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('outer').addEventListener('click', () => Lab.fail('Эта кнопка вне iframe'));
+</script>
+{% endblock %}

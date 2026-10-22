@@ -1,0 +1,82 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Мастер подключения из трёх шагов. Пройди его, но по пути проверь, что «Назад» не теряет данные:</p>
+<ol>
+  <li>Шаг 1: имя <code>Анна</code>, email <code>anna@aqa.lab</code> → «Далее».</li>
+  <li>Шаг 2: выбери тариф <b>Pro</b> → нажми «Назад».</li>
+  <li>Снова на шаге 1: проверь, что имя и email сохранились → «Далее».</li>
+  <li>Шаг 2: проверь, что Pro всё ещё выбран → «Далее».</li>
+  <li>Шаг 3: проверь сводку (имя, email, тариф), отметь согласие и нажми «Завершить».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Текущий шаг удобно проверять по заголовку: <code>expect(page.get_by_role("heading")).to_have_text("Шаг 2 из 3")</code>.
+  Сохранённые значения — <code>to_have_value</code>, выбранный тариф — <code>to_be_checked</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h2 id="title"></h2>
+  <div data-step="1">
+    <div class="field"><label for="name">Имя</label><input id="name"></div>
+    <div class="field"><label for="email">Email</label><input id="email" type="email"></div>
+  </div>
+  <div data-step="2">
+    <fieldset style="border:0; padding:0">
+      <legend class="muted">Тариф</legend>
+      <label class="inline"><input type="radio" name="plan" value="Basic"> Basic</label>
+      <label class="inline"><input type="radio" name="plan" value="Pro"> Pro</label>
+      <label class="inline"><input type="radio" name="plan" value="Team"> Team</label>
+    </fieldset>
+  </div>
+  <div data-step="3">
+    <dl id="summary" aria-label="Сводка"></dl>
+    <label class="inline"><input type="checkbox" id="agree"> Согласен с условиями</label>
+  </div>
+  <p class="error" role="alert" id="err"></p>
+  <div class="row">
+    <button id="back">Назад</button>
+    <button class="primary" id="next">Далее</button>
+    <button class="primary" id="finish">Завершить</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let step = 1, wentBack = false;
+  const $ = id => document.getElementById(id);
+  function render() {
+    const shownStep = Lab.mutant === 'title-wrong-step' && step === 3 ? 2 : step;
+    $('title').textContent = step <= 3 ? `Шаг ${shownStep} из 3` : 'Готово!';
+    document.querySelectorAll('[data-step]').forEach(s => s.classList.toggle('hidden', +s.dataset.step !== step));
+    $('back').classList.toggle('hidden', step === 1 || step > 3);
+    $('next').classList.toggle('hidden', step >= 3);
+    $('finish').classList.toggle('hidden', step !== 3);
+    $('err').textContent = '';
+    if (step === 3) {
+      const plan = document.querySelector('[name=plan]:checked');
+      const planName = Lab.mutant === 'summary-wrong-plan' ? 'Basic' : (plan ? plan.value : '—');
+      $('summary').innerHTML = `<dt>Имя</dt><dd>${$('name').value}</dd><dt>Email</dt><dd>${$('email').value}</dd><dt>Тариф</dt><dd>${planName}</dd>`;
+    }
+  }
+  $('next').addEventListener('click', () => {
+    if (step === 1 && (!$('name').value.trim() || !$('email').value.includes('@'))) return $('err').textContent = 'Заполните имя и email';
+    if (step === 2 && !document.querySelector('[name=plan]:checked')) return $('err').textContent = 'Выберите тариф';
+    step++; render();
+  });
+  $('back').addEventListener('click', () => { step--; wentBack = true; render(); });
+  $('finish').addEventListener('click', () => {
+    if (!$('agree').checked) return $('err').textContent = 'Нужно согласие с условиями';
+    step = 4; render();
+    const plan = document.querySelector('[name=plan]:checked').value;
+    const ok = $('name').value === 'Анна' && $('email').value === 'anna@aqa.lab' && plan === 'Pro';
+    if (!ok) return Lab.fail('Мастер завершён с другими данными');
+    if (!wentBack) return Lab.fail('Не было шага «Назад»');
+    Lab.success('Мастер пройден');
+  });
+  render();
+</script>
+{% endblock %}

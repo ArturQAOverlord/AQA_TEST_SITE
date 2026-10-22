@@ -1,0 +1,55 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Страница статуса сервисов — идеальный кандидат в <b>smoke-тесты</b>: быстрые проверки, которые запускают первыми
+  (после деплоя, перед полным прогоном).</p>
+<ol>
+  <li>Напиши тест: нажми «Проверить», убедись, что все три сервиса в статусе «OK».</li>
+  <li>Пометь тест маркером <code>@pytest.mark.smoke</code> (маркер уже зарегистрирован в <code>pytest.ini</code>).</li>
+  <li>Запусти только smoke-тесты: <code>pytest exercises -m smoke</code>.</li>
+</ol>
+<p>Проверка задания разбирает код: у <code>test_markers</code> должен быть маркер <code>smoke</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>import pytest
+
+@pytest.mark.smoke
+def test_markers(page: Page):
+    ...</code></pre>
+<p>Полезные выражения для <code>-m</code>: <code>"smoke and not slow"</code>, <code>"not slow"</code>.
+  Незарегистрированный маркер вызывает предупреждение, а с <code>--strict-markers</code> — ошибку.
+  Родственники маркеров: <code>@pytest.mark.skip(reason=…)</code>, <code>skipif(условие, reason=…)</code>,
+  <code>xfail</code> — «ожидаемо падает, баг уже заведён».</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Статус сервисов</h3>
+  <table>
+    <thead><tr><th>Сервис</th><th>Статус</th></tr></thead>
+    <tbody>
+      {% for s in ["API", "База данных", "Очередь задач"] %}
+      <tr><td>{{ s }}</td><td data-testid="service-status">—</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button class="primary" id="check">Проверить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('check').addEventListener('click', async e => {
+    e.target.disabled = true;
+    const cells = document.querySelectorAll('[data-testid="service-status"]');
+    for (const cell of cells) {
+      cell.textContent = '…';
+      await Lab.sleep(Lab.rand(200, 500));
+      cell.textContent = 'OK';
+      cell.className = 'ok';
+    }
+    Lab.success('Все сервисы проверены');
+  });
+</script>
+{% endblock %}

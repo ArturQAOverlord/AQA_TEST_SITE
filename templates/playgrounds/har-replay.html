@@ -1,0 +1,45 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Виджет погоды берёт данные из <code>GET /api/forecast</code>, и каждый раз они разные — сравнивать с эталоном невозможно.
+  Решение — записать ответ сервера один раз в HAR-файл и в тестах воспроизводить запись.</p>
+<ol>
+  <li><b>Запись.</b> В отдельном контексте открой страницу с <code>route_from_har(…, update=True)</code>, нажми
+    «Загрузить прогноз», запомни показанную температуру и закрой контекст — HAR сохраняется при закрытии.</li>
+  <li><b>Воспроизведение.</b> В фикстуре <code>page</code> подключи тот же HAR без <code>update</code>, загрузи прогноз и проверь,
+    что температура та же, а виджет пишет «Данные из HAR».</li>
+</ol>
+<p>Страница сама проверяет, пришёл ли прогноз от сервера только что или это старый, записанный ответ.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>har = tmp_path / "forecast.har"
+page.route_from_har(har, url="**/api/forecast", update=True)   # запись
+page.route_from_har(har, url="**/api/forecast")                # воспроизведение</code></pre>
+<p>Параметр <code>url</code> ограничивает HAR нужными запросами — остальные идут на сервер как обычно.
+  В реальных проектах HAR кладут рядом с тестами и перезаписывают, когда меняется API.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 400px">
+  <h3>Погода</h3>
+  <button class="primary" id="load">Загрузить прогноз</button>
+  <p id="forecast" data-testid="forecast" style="font-size: 22px"></p>
+  <span id="source" data-testid="source"></span>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const loadedAt = Date.now();
+  document.getElementById('load').addEventListener('click', async () => {
+    const data = await (await fetch('/api/forecast')).json();
+    document.getElementById('forecast').textContent = `${data.city}: ${data.temp}°, ${data.condition}`;
+    const check = await (await fetch(`/api/forecast/check?id=${encodeURIComponent(data.id)}&since=${loadedAt}&t=${Date.now()}`)).json();
+    const source = document.getElementById('source');
+    source.className = check.replayed ? 'badge green' : 'badge';
+    source.textContent = check.replayed ? 'Данные из HAR' : 'Живые данные с сервера';
+    if (check.replayed) Lab.success('Прогноз воспроизведён из HAR');
+  });
+</script>
+{% endblock %}

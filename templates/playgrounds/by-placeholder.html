@@ -1,0 +1,39 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>В шапке магазина два поля поиска, и у обоих нет подписей — только placeholder.</p>
+<p>Введи <code>наушники</code> в поле <b>поиска по каталогу</b> и нажми <kbd>Enter</kbd>.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>get_by_placeholder()</code> тоже ищет по подстроке, а слово «Поиск» есть в обоих полях.
+  Укажи placeholder полностью или добавь <code>exact=True</code>. Enter — <code>.press("Enter")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <div class="row">
+    <input placeholder="Поиск по каталогу" id="q-catalog">
+    <input placeholder="Поиск по блогу" id="q-blog">
+  </div>
+  <div id="results" class="muted">Начни поиск, чтобы увидеть результаты.</div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const results = document.getElementById('results');
+  document.getElementById('q-catalog').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const q = e.target.value.trim().toLowerCase();
+    results.textContent = `Каталог: найдено 12 товаров по запросу «${q}»`;
+    if (q === 'наушники') Lab.success('Нашли наушники');
+    else Lab.fail('Искали не то: ' + q);
+  });
+  document.getElementById('q-blog').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    results.textContent = 'Блог: статей не найдено';
+    Lab.fail('Это поиск по блогу, а нужен каталог');
+  });
+</script>
+{% endblock %}

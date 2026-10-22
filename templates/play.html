@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ mission.title }} · AQA Lab{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='play.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body data-slug="{{ mission.slug }}">
+  <main id="playground" class="playground">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="lab-footer">
+    <div id="mission-status" data-testid="mission-status" data-status="pending" aria-live="polite">{% if mission.kind == "bug" %}🔍 Миссия «найди баг»: тест должен упасть здесь — проверка через verify.py{% else %}⏳ Ожидание: выполни задание{% endif %}</div>
+  </footer>
+  {% if mutant %}<script>window.LAB_MUTANT = {{ mutant | tojson }};</script>{% endif %}
+  <script src="{{ url_for('static', filename='play.js') }}"></script>
+  {% block script %}{% endblock %}
+</body>
+</html>

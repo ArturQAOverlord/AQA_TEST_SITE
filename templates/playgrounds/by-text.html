@@ -1,0 +1,36 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Перед тобой галерея животных. Карточки — обычные <code>&lt;div&gt;</code> без ролей и атрибутов.
+  Кликни по карточке <b>«Пингвин»</b>.</p>
+<p>Осторожно: <code>get_by_text()</code> по умолчанию ищет <b>подстроку без учёта регистра</b>, а на странице есть
+  «Императорский пингвин» и «Пингвин Адели». Клик не по той карточке засчитывается как ошибка.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Попробуй <code>page.get_by_text("Пингвин")</code> — Playwright упадёт со <i>strict mode violation</i>
+  и покажет все найденные элементы. Параметр <code>exact=True</code> требует полного совпадения текста.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Галерея</h2>
+<div class="grid" id="animals">
+  <div class="card clickable" data-animal="cat">🐱 Котик</div>
+  <div class="card clickable" data-animal="emperor">🐧 Императорский пингвин</div>
+  <div class="card clickable" data-animal="penguin">Пингвин</div>
+  <div class="card clickable" data-animal="fox">🦊 Лиса</div>
+  <div class="card clickable" data-animal="adelie">Пингвин Адели</div>
+  <div class="card clickable" data-animal="owl">🦉 Сова</div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('#animals .card').forEach(card => card.addEventListener('click', () => {
+    document.querySelectorAll('#animals .card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    if (card.dataset.animal === 'penguin') Lab.success('Это именно тот пингвин');
+    else Lab.fail(`Мимо: «${card.textContent.trim()}»`);
+  }));
+</script>
+{% endblock %}

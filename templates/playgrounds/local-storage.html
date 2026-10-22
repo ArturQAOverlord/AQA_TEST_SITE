@@ -1,0 +1,50 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>При каждом открытии страницы показывается онбординг из пяти слайдов, который перекрывает интерфейс.
+  Он не показывается, если в localStorage есть <code>onboarding_done = "true"</code>.</p>
+<p>В тестах пролистывать онбординг каждый раз — долго. Запиши флаг в localStorage, перезагрузи страницу и нажми
+  «Создать проект». Засчитывается, только если онбординг на этой загрузке страницы не появлялся вовсе.</p>
+{% endblock %}
+
+{% block hint %}
+<p>localStorage привязан к origin, поэтому сначала нужно открыть страницу сайта:</p>
+<pre><code>page.goto("/play/local-storage")
+page.evaluate("localStorage.setItem('onboarding_done', 'true')")
+page.reload()</code></pre>
+<p>Как обойтись без лишней загрузки — смотри миссию про <code>add_init_script</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Мои проекты</h3>
+  <p class="muted">Пока пусто.</p>
+  <button class="primary" id="create">Создать проект</button>
+</div>
+<div class="overlay hidden" id="onboarding">
+  <div class="modal stack" role="dialog" aria-label="Знакомство">
+    <h3>Добро пожаловать! <span id="slide">1</span>/5</h3>
+    <p class="muted">Здесь мы расскажем обо всех возможностях…</p>
+    <button id="next">Дальше</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let done = null;
+  try { done = localStorage.getItem('onboarding_done'); } catch {}
+  const shown = done !== 'true';
+  if (shown) document.getElementById('onboarding').classList.remove('hidden');
+  let slide = 1;
+  document.getElementById('next').addEventListener('click', () => {
+    slide++;
+    if (slide > 5) { document.getElementById('onboarding').classList.add('hidden'); try { localStorage.setItem('onboarding_done', 'true'); } catch {} }
+    else document.getElementById('slide').textContent = slide;
+  });
+  document.getElementById('create').addEventListener('click', () => {
+    if (shown) return Lab.fail('онбординг показывался — флаг в localStorage не сработал');
+    Lab.success('Проект создан без онбординга');
+  });
+</script>
+{% endblock %}

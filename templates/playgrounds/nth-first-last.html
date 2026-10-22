@@ -1,0 +1,39 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Лента уведомлений. Отметь «Прочитано» у <b>первого</b>, <b>третьего</b> и <b>последнего</b> уведомлений —
+  и ни у каких других.</p>
+<p>Количество уведомлений меняется от загрузки к загрузке (от 5 до 8), так что «последнее» — это не фиксированный номер.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Найди все кнопки «Прочитано» одним локатором и используй <code>.first</code>, <code>.nth(2)</code>
+  (нумерация с нуля!) и <code>.last</code>. После клика кнопка становится disabled, но остаётся на месте — индексы не съезжают.</p>
+<p>Позиционные локаторы — крайняя мера: в реальных тестах лучше привязываться к содержимому.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Уведомления</h2>
+<ul class="plain" id="feed"></ul>
+{% endblock %}
+
+{% block script %}
+<script>
+  const count = Lab.rand(5, 8);
+  const read = new Set();
+  const need = new Set([0, 2, count - 1]);
+  const ul = document.getElementById('feed');
+  for (let i = 0; i < count; i++) {
+    const li = document.createElement('li');
+    li.className = 'card row';
+    li.innerHTML = `<span style="flex:1">Уведомление о событии #${Lab.rand(100, 999)}</span><button>Прочитано</button>`;
+    li.querySelector('button').addEventListener('click', e => {
+      e.target.disabled = true;
+      read.add(i);
+      if (!need.has(i)) return Lab.fail(`Уведомление №${i + 1} не нужно было трогать`);
+      if ([...need].every(n => read.has(n))) Lab.success('Первое, третье и последнее прочитаны');
+    });
+    ul.appendChild(li);
+  }
+</script>
+{% endblock %}

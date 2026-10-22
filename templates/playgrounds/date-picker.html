@@ -1,0 +1,69 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Бронирование. Поле даты только для чтения — дату можно выбрать лишь в самописном календаре.</p>
+<p>Выбери <b>14 марта 2027</b> и нажми «Забронировать».</p>
+<p>Календарь открывается на <b>случайном</b> месяце 2026–2027 года, так что количество кликов по стрелкам заранее неизвестно.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Крути календарь в цикле, пока заголовок не станет нужным:</p>
+<pre><code>header = page.get_by_test_id("calendar-title")
+while header.inner_text() != "Март 2027":
+    ...  # стрелка вперёд или назад</code></pre>
+<p>Чтобы понять направление, сравни год и номер месяца из заголовка с целевыми.
+  День — кнопка с именем <code>"14"</code>. Имя в <code>get_by_role</code> сравнивается по подстроке: для «14» это
+  не страшно, а вот кнопка «1» совпала бы с «10», «11», «21»… Привыкай ставить <code>exact=True</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 360px">
+  <div class="field"><label for="date">Дата заезда</label><input id="date" readonly placeholder="дд.мм.гггг"></div>
+  <div id="cal" class="card hidden">
+    <div class="row" style="justify-content: space-between">
+      <button aria-label="Предыдущий месяц" id="prev">‹</button>
+      <b data-testid="calendar-title" id="title"></b>
+      <button aria-label="Следующий месяц" id="next">›</button>
+    </div>
+    <div id="days" style="display:grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px"></div>
+  </div>
+  <button class="primary" id="book">Забронировать</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  let year = Lab.rand(2026, 2027), month = Lab.rand(0, 11);
+  let picked = null;
+  const input = document.getElementById('date');
+  const cal = document.getElementById('cal');
+  function render() {
+    document.getElementById('title').textContent = `${MONTHS[month]} ${year}`;
+    const days = document.getElementById('days');
+    days.innerHTML = '';
+    const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+    for (let i = 0; i < offset; i++) days.appendChild(document.createElement('span'));
+    const total = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= total; d++) {
+      const b = document.createElement('button');
+      b.textContent = d;
+      b.style.padding = '4px';
+      b.addEventListener('click', () => {
+        picked = { d, m: month, y: year };
+        input.value = `${String(d).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year}`;
+        cal.classList.add('hidden');
+      });
+      days.appendChild(b);
+    }
+  }
+  input.addEventListener('click', () => { cal.classList.remove('hidden'); render(); });
+  document.getElementById('prev').addEventListener('click', () => { month--; if (month < 0) { month = 11; year--; } render(); });
+  document.getElementById('next').addEventListener('click', () => { month++; if (month > 11) { month = 0; year++; } render(); });
+  document.getElementById('book').addEventListener('click', () => {
+    if (!picked) return Lab.fail('Дата не выбрана');
+    if (input.value === '14.03.2027') Lab.success('Забронировано на 14.03.2027');
+    else Lab.fail('Выбрана дата ' + input.value);
+  });
+</script>
+{% endblock %}

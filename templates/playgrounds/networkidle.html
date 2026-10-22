@@ -1,0 +1,46 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Дашборд после загрузки страницы по очереди запрашивает данные для 4 виджетов (<code>/api/widgets/1..4</code>),
+  на всё уходит около 4–5 секунд. Кнопка «Сохранить отчёт» активна сразу, но отчёт с недогруженными виджетами
+  засчитывается как провал.</p>
+<p>Дождись, пока сеть успокоится, и нажми «Сохранить отчёт».</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.goto("/play/networkidle")
+page.wait_for_load_state("networkidle")</code></pre>
+<p><code>networkidle</code> — это «нет сетевых запросов хотя бы 500 мс». Документация Playwright <b>не рекомендует</b>
+  полагаться на него в реальных тестах: лучше ждать конкретный признак готовности. Здесь, например, у каждого виджета
+  появляется <code>data-loaded="true"</code>. Попробуй оба способа.</p>
+{% endblock %}
+
+{% block content %}
+<div class="grid" id="widgets">
+  {% for name in ["Пользователи", "Заказы", "Выручка", "Ошибки"] %}
+  <div class="card stack widget" data-testid="widget" data-loaded="false">
+    <span class="muted">{{ name }}</span>
+    <b style="font-size: 24px" class="value"><span class="spinner"></span></b>
+  </div>
+  {% endfor %}
+</div>
+<p><button class="primary" id="save" style="margin-top: 16px">Сохранить отчёт</button></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  const widgets = [...document.querySelectorAll('.widget')];
+  window.addEventListener('load', async () => {
+    for (let i = 0; i < widgets.length; i++) {
+      const data = await (await fetch(`/api/widgets/${i + 1}`)).json();
+      widgets[i].querySelector('.value').textContent = data.value;
+      widgets[i].dataset.loaded = 'true';
+    }
+  });
+  document.getElementById('save').addEventListener('click', () => {
+    const loaded = widgets.filter(w => w.dataset.loaded === 'true').length;
+    if (loaded === widgets.length) Lab.success('Отчёт сохранён со всеми данными');
+    else Lab.fail(`Загружено только ${loaded} из ${widgets.length} виджетов`);
+  });
+</script>
+{% endblock %}

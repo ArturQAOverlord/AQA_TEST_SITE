@@ -1,0 +1,49 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Поиск по инструментам (<code>GET /api/search?q=...</code>) отвечает почти мгновенно, поэтому индикатор
+  «Ищем…» на локальном сервере никто не успевает увидеть.</p>
+<p>Задержи ответ минимум на <b>1,5 секунды</b>, найди <code>py</code> и проверь, что сначала виден индикатор
+  «Ищем…», а потом — результаты, среди которых есть «pytest».</p>
+{% endblock %}
+
+{% block hint %}
+<p>Самый надёжный способ в sync API — «придержать» запрос: обработчик только запоминает route, а тест сам решает,
+  когда его отпустить.</p>
+<pre><code>held = []
+page.route("**/api/search*", lambda route: held.append(route))
+... # клик по «Найти»
+expect(page.get_by_text("Ищем…")).to_be_visible()
+page.wait_for_timeout(1500)
+held[0].continue_()</code></pre>
+<p><code>time.sleep()</code> внутри обработчика блокирует весь Playwright — проверки в это время тоже стоят.
+  Для Chromium есть ещё эмуляция медленной сети через CDP (<code>Network.emulateNetworkConditions</code>).</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <div class="row">
+    <input placeholder="Инструмент" id="q">
+    <button class="primary" id="go">Найти</button>
+  </div>
+  <div id="loading" class="hidden"><span class="spinner"></span> Ищем…</div>
+  <ul id="results" class="plain" aria-label="Результаты"></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('go').addEventListener('click', async () => {
+    const q = document.getElementById('q').value;
+    document.getElementById('results').innerHTML = '';
+    document.getElementById('loading').classList.remove('hidden');
+    const started = performance.now();
+    const items = await (await fetch('/api/search?q=' + encodeURIComponent(q))).json();
+    const took = performance.now() - started;
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').innerHTML = items.map(i => `<li>${i}</li>`).join('') || '<li class="muted">Ничего не найдено</li>';
+    if (took >= 1500 && items.length) Lab.success(`Ответ шёл ${Math.round(took)} мс`);
+    else if (items.length) Lab.fail(`Ответ пришёл за ${Math.round(took)} мс — нужно не меньше 1500`);
+  });
+</script>
+{% endblock %}

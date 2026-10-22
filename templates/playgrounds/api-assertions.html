@@ -1,0 +1,49 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Не всё надо делать через интерфейс. У <code>page</code> есть встроенный HTTP-клиент <code>page.request</code>,
+  который делит cookies с браузером.</p>
+<ol>
+  <li><code>GET /api/users</code>: статус 200, в ответе ровно 3 пользователя, первый — «Алиса».</li>
+  <li><code>POST /api/todos</code> с телом <code>{"title": "Написать тест"}</code>: статус <b>201</b>, в ответе
+    <code>title</code> совпадает, <code>done</code> — <code>false</code>, <code>id</code> — целое число.</li>
+  <li>Открой <code>/play/api-assertions</code> и проверь, что созданная задача видна в списке с пометкой «создана тобой».</li>
+</ol>
+<p>Страница опознаёт «твою» задачу по cookie, которую сервер ставит в ответ на POST, поэтому задачу нужно создать
+  именно через <code>page.request</code>, а не сторонним клиентом.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>response = page.request.post("/api/todos", data={"title": "Написать тест"})
+expect(response).to_be_ok()          # 2xx
+assert response.status == 201
+todo = response.json()</code></pre>
+<p>Относительные URL работают, потому что у контекста есть <code>base_url</code>.
+  <code>expect(response).to_be_ok()</code> проверяет только диапазон 2xx — точный код проверяй отдельно.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 460px">
+  <h3>Задачи</h3>
+  <ul class="plain" id="todos" aria-label="Задачи"><li class="muted">Загрузка…</li></ul>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const mine = (document.cookie.match(/(?:^|;\s*)lab_todo=(\d+)/) || [])[1];
+  fetch('/api/todos').then(r => r.json()).then(todos => {
+    const ul = document.getElementById('todos');
+    ul.innerHTML = todos.length ? '' : '<li class="muted">Задач пока нет</li>';
+    todos.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'row';
+      const isMine = String(t.id) === mine;
+      li.innerHTML = `<span>${t.done ? '✅' : '⬜'} ${t.title}</span>` + (isMine ? '<span class="badge green">создана тобой</span>' : '');
+      ul.appendChild(li);
+    });
+    const own = todos.find(t => String(t.id) === mine);
+    if (own && own.title === 'Написать тест') Lab.success('Задача из API видна в интерфейсе');
+  });
+</script>
+{% endblock %}

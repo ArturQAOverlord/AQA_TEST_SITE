@@ -1,0 +1,60 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Страница новостей при загрузке делает три вещи:</p>
+<ul>
+  <li>отправляет событие аналитики — <code>POST /api/analytics/track</code>;</li>
+  <li>показывает рекламный баннер — картинку <code>/static/ads/banner.svg</code>;</li>
+  <li>загружает полезный контент — <code>GET /api/products</code>.</li>
+</ul>
+<p>Заблокируй аналитику и рекламу, но <b>не трогай</b> контент. Проверь, что на странице написано
+  «Аналитика: заблокирована» и «Реклама: заблокирована».</p>
+{% endblock %}
+
+{% block hint %}
+<p>Всё происходит сразу при загрузке — значит, <code>page.route()</code> надо зарегистрировать <b>до</b> <code>page.goto()</code>.</p>
+<pre><code>page.route("**/api/analytics/**", lambda route: route.abort())
+page.route("**/ads/**", lambda route: route.abort())</code></pre>
+<p>Слишком широкий шаблон вроде <code>"**/api/**"</code> заблокирует и контент — тогда миссия провалится.
+  Ещё можно блокировать по типу ресурса: <code>route.request.resource_type == "image"</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <h2>Новости тестирования</h2>
+  <img src="{{ url_for('static', filename='ads/banner.svg') }}" alt="Реклама" id="ad" style="max-width: 100%">
+  <ul id="content" class="plain"><li class="muted">Загрузка контента…</li></ul>
+  <p class="muted" data-testid="analytics-state">Аналитика: …</p>
+  <p class="muted" data-testid="ads-state">Реклама: …</p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const result = {};
+  const done = () => {
+    if (!('analytics' in result && 'ads' in result && 'content' in result)) return;
+    if (!result.content) return Lab.fail('Контент тоже заблокирован — шаблон слишком широкий');
+    if (!result.analytics && !result.ads) Lab.success('Трекинг и реклама заблокированы');
+    else Lab.fail('Заблокировано не всё');
+  };
+  const set = (key, blocked) => {
+    result[key] = !blocked;
+    const label = key === 'analytics' ? 'Аналитика' : 'Реклама';
+    document.querySelector(`[data-testid="${key}-state"]`).textContent = `${label}: ${blocked ? 'заблокирована' : 'загружена'}`;
+    done();
+  };
+  fetch('/api/analytics/track', { method: 'POST', body: JSON.stringify({ event: 'page_view' }) })
+    .then(r => set('analytics', !r.ok), () => set('analytics', true));
+  const ad = document.getElementById('ad');
+  if (ad.complete) set('ads', ad.naturalWidth === 0);
+  else { ad.addEventListener('load', () => set('ads', false)); ad.addEventListener('error', () => set('ads', true)); }
+  fetch('/api/products').then(r => r.json()).then(items => {
+    document.getElementById('content').innerHTML = items.map(i => `<li>📰 Обзор: ${i.name}</li>`).join('');
+    result.content = true; done();
+  }, () => {
+    document.getElementById('content').innerHTML = '<li class="error">Контент не загрузился</li>';
+    result.content = false; done();
+  });
+</script>
+{% endblock %}

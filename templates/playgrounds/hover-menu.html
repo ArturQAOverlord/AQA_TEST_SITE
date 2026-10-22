@@ -1,0 +1,61 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Верхнее меню сайта. Подменю раздела «Продукты» раскрывается только при <b>наведении мыши</b>.
+  Перейди в пункт <b>«API для разработчиков»</b>.</p>
+<p>Подсказка над иконкой ⓘ тоже появляется по наведению — в ней написан номер версии API. Он тебе не нужен, но проверить
+  его текст через <code>expect</code> — хорошая тренировка.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.get_by_role("button", name="Продукты").hover()
+page.get_by_role("link", name="API для разработчиков").click()</code></pre>
+<p>Пока подменю скрыто, Playwright не сможет по нему кликнуть и будет ждать, пока элемент станет видимым.</p>
+{% endblock %}
+
+{% block head %}
+<style>
+  .menu { display: flex; gap: 8px; background: #1f2430; padding: 8px; border-radius: 10px; }
+  .menu > .item { position: relative; }
+  .menu > .item > button { background: transparent; color: #fff; border: 0; }
+  .submenu { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #dde2ec;
+    border-radius: 8px; padding: 6px; min-width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .submenu a { display: block; padding: 6px 8px; color: #1f2430; text-decoration: none; border-radius: 6px; }
+  .submenu a:hover { background: #eef2ff; }
+  .item:hover .submenu { display: block; }
+  .tip { position: relative; cursor: help; }
+  .tip .tooltip { display: none; position: absolute; bottom: 120%; left: -20px; background: #1f2430; color: #fff;
+    padding: 4px 8px; border-radius: 6px; white-space: nowrap; font-size: 12px; }
+  .tip:hover .tooltip { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="menu">
+  <div class="item"><button>Главная</button></div>
+  <div class="item">
+    <button>Продукты</button>
+    <div class="submenu">
+      <a href="#analytics" data-page="analytics">Аналитика</a>
+      <a href="#api" data-page="api">API для разработчиков</a>
+      <a href="#mobile" data-page="mobile">Мобильное приложение</a>
+    </div>
+  </div>
+  <div class="item"><button>Цены</button></div>
+</nav>
+<div class="panel" style="margin-top: 60px">
+  <span class="tip">ⓘ<span class="tooltip" role="tooltip">Версия API: v3.2.1</span></span>
+  <span id="page" class="muted">Выбери раздел в меню</span>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('[data-page]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('page').textContent = 'Открыт раздел: ' + a.textContent;
+    if (a.dataset.page === 'api') Lab.success('Добро пожаловать в API');
+    else Lab.fail('Открыт другой раздел');
+  }));
+</script>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Биржевой виджет. Кнопка «Подписаться на PWRT» открывает WebSocket <code>/ws/quotes</code>, отправляет
+  <code>{"subscribe": "PWRT"}</code>, и сервер каждые полсекунды присылает фрейм <code>{"symbol": "PWRT", "price": 1253.4}</code>.</p>
+<p>На экране видны только стрелочки ▲▼ — самих цен нет. Достань цену из любого полученного фрейма, впиши её в поле
+  «Цена из фрейма» и нажми «Проверить».</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>with page.expect_websocket() as ws_info:
+    page.get_by_role("button", name="Подписаться на PWRT").click()
+ws = ws_info.value
+
+with ws.expect_event("framereceived") as frame_info:
+    pass  # просто дожидаемся следующего фрейма
+price = json.loads(frame_info.value)["price"]</code></pre>
+<p>Ещё вариант — копить все фреймы: <code>ws.on("framereceived", lambda payload: frames.append(payload))</code>.
+  Отправленные страницей сообщения видны в событии <code>framesent</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Котировки</h3>
+  <button class="primary" id="sub">Подписаться на PWRT</button>
+  <p id="ticker" class="muted" style="font-size: 22px; letter-spacing: 2px">—</p>
+  <div class="field"><label for="price">Цена из фрейма</label><input id="price"></div>
+  <button id="check">Проверить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const received = new Set();
+  let last = null;
+  document.getElementById('sub').addEventListener('click', e => {
+    e.target.disabled = true;
+    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/quotes`);
+    ws.addEventListener('open', () => ws.send(JSON.stringify({ subscribe: 'PWRT' })));
+    ws.addEventListener('message', ev => {
+      const data = JSON.parse(ev.data);
+      if (data.price === undefined) return;
+      received.add(data.price);
+      const arrow = last === null ? '•' : data.price >= last ? '▲' : '▼';
+      last = data.price;
+      const t = document.getElementById('ticker');
+      t.textContent = (t.textContent.replace('—', '') + arrow).slice(-12);
+    });
+  });
+  document.getElementById('check').addEventListener('click', () => {
+    const value = parseFloat(document.getElementById('price').value.replace(',', '.'));
+    if (received.has(value)) Lab.success('Цена совпала с фреймом');
+    else Lab.fail('такой цены сервер не присылал');
+  });
+</script>
+{% endblock %}

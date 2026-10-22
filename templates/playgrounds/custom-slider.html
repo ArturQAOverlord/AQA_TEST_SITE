@@ -1,0 +1,56 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Слайдер «Громкость» — это <code>&lt;div role="slider"&gt;</code>, а не <code>input type="range"</code>,
+  так что <code>fill()</code> не сработает. Шаг — 5, начальное значение случайное.</p>
+<p>Установи громкость ровно <b>75</b> и нажми «Применить».</p>
+<p>Клавиши: <kbd>ArrowRight</kbd>/<kbd>ArrowLeft</kbd> — ±5, <kbd>Home</kbd>/<kbd>End</kbd> — 0/100.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Самый надёжный путь — клавиатура: <code>slider.press("Home")</code>, затем 15 раз
+  <code>press("ArrowRight")</code>. Проверить результат: <code>to_have_attribute("aria-valuenow", "75")</code>.</p>
+<p>Мышью тоже можно: клик по точке трека с координатами из <code>bounding_box()</code>, но попасть ровно в 75 сложнее.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <span id="vol-label">Громкость</span>
+  <div id="track" style="position:relative; height:8px; background:#dde2ec; border-radius:4px; cursor:pointer; margin: 12px 0">
+    <div id="fill" style="position:absolute; left:0; top:0; bottom:0; background:#2d6cdf; border-radius:4px"></div>
+    <div role="slider" tabindex="0" aria-labelledby="vol-label" aria-valuemin="0" aria-valuemax="100" id="thumb"
+         style="position:absolute; top:-6px; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#fff; border:2px solid #2d6cdf"></div>
+  </div>
+  <p>Значение: <b id="value"></b></p>
+  <button class="primary" id="apply">Применить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const thumb = document.getElementById('thumb');
+  let value = Lab.rand(0, 20) * 5;
+  while (value === 75) value = Lab.rand(0, 20) * 5;
+  function set(v) {
+    value = Math.max(0, Math.min(100, Math.round(v / 5) * 5));
+    thumb.setAttribute('aria-valuenow', value);
+    thumb.style.left = value + '%';
+    document.getElementById('fill').style.width = value + '%';
+    document.getElementById('value').textContent = value;
+  }
+  thumb.addEventListener('keydown', e => {
+    const map = { ArrowRight: value + 5, ArrowUp: value + 5, ArrowLeft: value - 5, ArrowDown: value - 5, Home: 0, End: 100 };
+    if (e.key in map) { e.preventDefault(); set(map[e.key]); }
+  });
+  document.getElementById('track').addEventListener('mousedown', e => {
+    const box = e.currentTarget.getBoundingClientRect();
+    set((e.clientX - box.left) / box.width * 100);
+    thumb.focus();
+  });
+  document.getElementById('apply').addEventListener('click', () => {
+    if (value === 75) Lab.success('Громкость 75');
+    else Lab.fail(`громкость ${value}, а нужно 75`);
+  });
+  set(value);
+</script>
+{% endblock %}

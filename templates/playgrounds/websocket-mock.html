@@ -1,0 +1,54 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Тот же виджет котировок, но тикер <b>LAB</b> ещё не запущен на бирже: настоящий сервер отвечает
+  <code>{"error": "unknown symbol"}</code>. А проверить отображение нужно уже сейчас.</p>
+<p>Притворись WebSocket-сервером: когда страница пришлёт <code>{"subscribe": "LAB"}</code>, ответь двумя фреймами —
+  <code>{"symbol": "LAB", "price": 1000}</code> и <code>{"symbol": "LAB", "price": 1100}</code>.
+  Проверь, что виджет показывает «LAB: 1100 ₽ (+10.0%)».</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>def fake_server(ws: WebSocketRoute):
+    def on_message(message):
+        if json.loads(message).get("subscribe") == "LAB":
+            ws.send(json.dumps({"symbol": "LAB", "price": 1000}))
+            ...
+    ws.on_message(on_message)
+
+page.route_web_socket("**/ws/quotes", fake_server)
+page.goto(...)</code></pre>
+<p>Без <code>ws.connect_to_server()</code> настоящий сервер вообще не участвует. С ним можно пропускать часть сообщений
+  к серверу и подменять только нужные.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Новый тикер</h3>
+  <button class="primary" id="sub">Подписаться на LAB</button>
+  <p id="quote" data-testid="quote" style="font-size: 22px">—</p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const prices = [];
+  document.getElementById('sub').addEventListener('click', e => {
+    e.target.disabled = true;
+    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/quotes`);
+    ws.addEventListener('open', () => ws.send(JSON.stringify({ subscribe: 'LAB' })));
+    ws.addEventListener('message', ev => {
+      const data = JSON.parse(ev.data);
+      const quote = document.getElementById('quote');
+      if (data.error) { quote.className = 'error'; quote.textContent = 'Ошибка: неизвестный тикер ' + data.symbol; return; }
+      if (data.symbol !== 'LAB') return;
+      prices.push(data.price);
+      quote.className = '';
+      const first = prices[0];
+      const change = prices.length > 1 ? ` (${data.price >= first ? '+' : ''}${((data.price - first) / first * 100).toFixed(1)}%)` : '';
+      quote.textContent = `LAB: ${data.price} ₽${change}`;
+      if (prices.length >= 2) Lab.success('Виджет показал данные от мок-сервера');
+    });
+  });
+</script>
+{% endblock %}

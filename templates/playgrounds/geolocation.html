@@ -1,0 +1,53 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Сервис доставки определяет город по геолокации браузера. В тестах реальное местоположение не годится,
+  а без разрешения браузер его вообще не отдаст.</p>
+<ol>
+  <li>Выдай контексту разрешение <code>geolocation</code> и задай координаты Казани:
+    широта <code>55.7961</code>, долгота <code>49.1064</code>.</li>
+  <li>Нажми «Определить город» и проверь текст «Ваш город: Казань».</li>
+  <li>Нажми «Подтвердить».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.context.grant_permissions(["geolocation"])
+page.context.set_geolocation({"latitude": 55.7961, "longitude": 49.1064})</code></pre>
+<p>Без <code>grant_permissions</code> страница получит отказ — проверь, что тогда видна ошибка.
+  Разрешения и геолокацию можно задать и при создании контекста: <code>new_context(geolocation=..., permissions=[...])</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Доставка</h3>
+  <button id="detect">Определить город</button>
+  <p id="city" class="muted"></p>
+  <button class="primary hidden" id="confirm">Подтвердить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const cities = [['Москва', 55.7558, 37.6173], ['Казань', 55.7961, 49.1064], ['Новосибирск', 55.0084, 82.9357], ['Владивосток', 43.1155, 131.8855]];
+  let detected = null;
+  document.getElementById('detect').addEventListener('click', () => {
+    const out = document.getElementById('city');
+    out.textContent = 'Определяем…';
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude: la, longitude: lo } = pos.coords;
+      detected = cities.reduce((best, c) => Math.hypot(c[1] - la, c[2] - lo) < Math.hypot(best[1] - la, best[2] - lo) ? c : best)[0];
+      out.className = '';
+      out.textContent = 'Ваш город: ' + detected;
+      document.getElementById('confirm').classList.remove('hidden');
+    }, err => {
+      out.className = 'error';
+      out.textContent = err.code === 1 ? 'Доступ к геолокации запрещён' : 'Не удалось определить местоположение';
+    }, { timeout: 5000 });
+  });
+  document.getElementById('confirm').addEventListener('click', () => {
+    if (detected === 'Казань') Lab.success('Доставка в Казань');
+    else Lab.fail('определён город ' + detected);
+  });
+</script>
+{% endblock %}

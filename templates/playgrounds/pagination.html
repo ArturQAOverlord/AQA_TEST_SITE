@@ -1,0 +1,64 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Справочник сотрудников: 50 человек, по 10 на странице. Найди <b>Зою Кузнецову</b> и нажми «Написать» в её строке.</p>
+<p>На какой странице она окажется — заранее неизвестно. Листать можно кнопками «Назад» / «Вперёд».</p>
+{% endblock %}
+
+{% block hint %}
+<p>Цикл: пока строки с Зоей на странице нет (<code>row.count() == 0</code>) — жми «Вперёд».</p>
+<pre><code>row = page.get_by_role("row").filter(has_text="Зоя Кузнецова")
+while row.count() == 0:
+    page.get_by_role("button", name="Вперёд").click()</code></pre>
+<p>Подвох: <code>count()</code> не ждёт. Если таблица перерисовывается с задержкой, цикл проскочит страницу.
+  Здесь перерисовка асинхронная — дождись, пока сменится номер страницы, прежде чем считать строки.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack">
+  <table>
+    <thead><tr><th>Имя</th><th>Отдел</th><th></th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="row">
+    <button id="prev">Назад</button>
+    <span data-testid="page-info" id="info"></span>
+    <button id="next">Вперёд</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const first = ['Анна', 'Борис', 'Вера', 'Глеб', 'Дина', 'Егор', 'Жанна', 'Илья', 'Карина', 'Лев'];
+  const last = ['Иванов', 'Петров', 'Сидоров', 'Кузнецов', 'Смирнов'];
+  const depts = ['QA', 'Backend', 'Frontend', 'DevOps'];
+  const people = [];
+  for (let i = 0; i < 49; i++) {
+    const f = first[i % first.length], l = last[Math.floor(i / 10) % last.length];
+    const fem = /а$/.test(f);
+    people.push({ name: `${f} ${l}${fem ? 'а' : ''}`, dept: depts[i % 4] });
+  }
+  const target = Lab.rand(12, 49);
+  people.splice(target, 0, { name: 'Зоя Кузнецова', dept: 'QA', target: true });
+  let page = 0;
+  const pages = Math.ceil(people.length / 10);
+  async function render() {
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="3"><span class="spinner"></span></td></tr>';
+    await Lab.sleep(Lab.rand(150, 400));
+    document.getElementById('tbody').innerHTML = '';
+    people.slice(page * 10, page * 10 + 10).forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.name}</td><td>${p.dept}</td><td><button>Написать</button></td>`;
+      tr.querySelector('button').addEventListener('click', () => p.target ? Lab.success('Письмо Зое отправлено') : Lab.fail(`написали не тому: ${p.name}`));
+      document.getElementById('tbody').appendChild(tr);
+    });
+    document.getElementById('info').textContent = `Страница ${page + 1} из ${pages}`;
+    document.getElementById('prev').disabled = page === 0;
+    document.getElementById('next').disabled = page === pages - 1;
+  }
+  document.getElementById('prev').addEventListener('click', () => { page--; render(); });
+  document.getElementById('next').addEventListener('click', () => { page++; render(); });
+  render();
+</script>
+{% endblock %}

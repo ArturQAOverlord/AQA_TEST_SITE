@@ -1,0 +1,10 @@
+<p><b>BrowserContext</b> — изолированный «профиль» браузера: свои cookies, localStorage, кэш, разрешения. Фикстура
+  <code>page</code> из pytest-playwright создаёт новый контекст на каждый тест, поэтому тесты не видят данные друг друга.</p>
+<ul>
+  <li>Настройки контекста по умолчанию задаются фикстурой <code>browser_context_args</code>; второй контекст в тесте —
+    <code>browser.new_context(**browser_context_args)</code>.</li>
+  <li><code>storage_state</code> сохраняет cookies и localStorage — так «логинятся» один раз на весь прогон.</li>
+  <li><code>add_init_script</code> выполняется до скриптов страницы в каждом документе — для флагов и заглушек.</li>
+  <li>Эмуляция: <code>set_viewport_size</code>, <code>devices["iPhone 13"]</code>, <code>emulate_media</code>, <code>set_geolocation</code>,
+    <code>set_offline</code>, <code>page.clock</code>.</li>
+</ul>

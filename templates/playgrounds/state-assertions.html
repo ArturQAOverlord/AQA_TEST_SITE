@@ -1,0 +1,46 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Форма регистрации. Проверь состояния элементов по ходу дела:</p>
+<ol>
+  <li>Кнопка «Зарегистрироваться» сначала <b>disabled</b>, чекбокс «Принимаю условия» <b>не отмечен</b>.</li>
+  <li>Поле «Логин» заполнено автоматически и <b>не редактируется</b>, поле «Email» — <b>редактируется</b>.</li>
+  <li>Введи email <code>me@aqa.lab</code> и отметь чекбокс — чекбокс <b>checked</b>, кнопка <b>enabled</b>.</li>
+  <li>Нажми «Зарегистрироваться».</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<p>Пригодятся: <code>to_be_disabled()</code>, <code>to_be_enabled()</code>, <code>to_be_checked()</code>,
+  <code>not_to_be_checked()</code>, <code>to_be_editable()</code>, <code>not_to_be_editable()</code>.</p>
+<p>Многие проверки принимают параметр: <code>to_be_checked(checked=False)</code>, <code>to_be_enabled(enabled=False)</code>.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" id="form" style="max-width: 400px">
+  <div class="field"><label for="login">Логин</label><input id="login" readonly></div>
+  <div class="field"><label for="email">Email</label><input id="email" type="email"></div>
+  <div class="field"><label class="inline"><input type="checkbox" id="terms"> Принимаю условия</label></div>
+  <button class="primary" id="submit" type="submit" disabled>Зарегистрироваться</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('login').value = 'user_' + Lab.rand(1000, 9999);
+  if (Lab.mutant === 'login-editable') document.getElementById('login').readOnly = false;
+  const terms = document.getElementById('terms');
+  const email = document.getElementById('email');
+  const submit = document.getElementById('submit');
+  if (Lab.mutant === 'terms-prechecked') terms.checked = true;
+  const sync = () => submit.disabled = Lab.mutant === 'always-enabled' ? false : !(terms.checked && email.value.includes('@'));
+  sync();
+  terms.addEventListener('change', sync);
+  email.addEventListener('input', sync);
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    if (email.value === 'me@aqa.lab') Lab.success('Регистрация завершена');
+    else Lab.fail('Ожидался email me@aqa.lab');
+  });
+</script>
+{% endblock %}

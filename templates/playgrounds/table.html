@@ -1,0 +1,45 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Таблица сотрудников. В компании две <b>Анны Смирновы</b>. Нажми «Изменить» у той, что работает в отделе <b>QA</b>.</p>
+<p>Порядок строк перемешивается при каждой загрузке.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Строка таблицы — роль <code>row</code>, ячейка — <code>cell</code>. Отфильтруй строки дважды:
+  по имени и по ячейке отдела.</p>
+<p>Ловушка: <code>filter(has_text="QA")</code> ищет подстроку без учёта регистра — а «qa» может встретиться,
+  например, в email. Надёжнее <code>filter(has=page.get_by_role("cell", name="QA", exact=True))</code>.</p>
+{% endblock %}
+
+{% block content %}
+<h2>Сотрудники</h2>
+<table>
+  <thead><tr><th>Имя</th><th>Отдел</th><th>Email</th><th></th></tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+<p id="edit" class="muted"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  const people = [
+    { id: 1, name: 'Анна Смирнова', dept: 'Analytics', email: 'a.smirnova.qa-team-lead@corp.ru' },
+    { id: 2, name: 'Пётр Иванов', dept: 'QA', email: 'p.ivanov@corp.ru' },
+    { id: 3, name: 'Анна Смирнова', dept: 'QA', email: 'anna.s@corp.ru' },
+    { id: 4, name: 'Олег Ким', dept: 'Backend', email: 'o.kim@corp.ru' },
+    { id: 5, name: 'Мария Соколова', dept: 'QA Automation', email: 'm.sokolova@corp.ru' },
+  ].sort(() => Math.random() - .5);
+  const tbody = document.getElementById('tbody');
+  people.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.name}</td><td>${p.dept}</td><td>${p.email}</td><td><button>Изменить</button></td>`;
+    tr.querySelector('button').addEventListener('click', () => {
+      document.getElementById('edit').textContent = `Редактируем: ${p.name} (${p.dept})`;
+      if (p.id === 3) Lab.success('Правильная Анна');
+      else Lab.fail(`Это ${p.name} из ${p.dept}`);
+    });
+    tbody.appendChild(tr);
+  });
+</script>
+{% endblock %}

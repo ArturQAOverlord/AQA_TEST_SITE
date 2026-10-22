@@ -1,0 +1,54 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Тест на форму подписки проходит, но разработчики жалуются: он ломается от любого изменения вёрстки.</p>
+<pre><code>def test_fix_brittle_locators(page: Page):
+    page.goto("/play/fix-brittle-locators")
+    page.locator("div.container > div:nth-child(2) > input").fill("Иван")
+    page.locator("#email-input-v2").fill("ivan@test.ru")
+    page.locator("div.container > div:nth-child(4) > select").select_option("pro")
+    page.locator("button.btn.btn-primary.mt-3").click()
+    expect(page.get_by_test_id("mission-status")).to_have_attribute("data-status", "success")</code></pre>
+<p>Перепиши его так, чтобы он пережил редизайн: «Запустить проверку» прогонит тест на трёх переделанных версиях формы
+  (другие классы и id, другой порядок полей, лишние обёртки). Поведение формы и подписи полей при этом не меняются.
+  Ещё проверка разбирает код: CSS-селекторов с <code>nth-child</code>, <code>#id</code>, классами и <code>&gt;</code> быть не должно.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Привязывайся к тому, что видит пользователь и что не меняется при редизайне: подписи полей (<code>get_by_label</code>),
+  роль и текст кнопки (<code>get_by_role</code>). Тариф лучше выбрать по видимому тексту: <code>select_option(label="Pro")</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div id="root"></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const variant = Lab.mutant;
+  const cls = variant === 'classes-renamed'
+    ? { container: 'ui-card', row: 'ui-field', input: 'ui-input', button: 'cta cta--main', email: 'subscriber-mail' }
+    : { container: 'container', row: 'row', input: 'form-control', button: 'btn btn-primary mt-3', email: 'email-input-v2' };
+  const fields = [
+    { id: 'name-input', label: 'Имя', html: id => `<input id="${id}" class="${cls.input}">` },
+    { id: cls.email, label: 'Email', html: id => `<input id="${id}" class="${cls.input}" type="email">` },
+    { id: 'plan', label: 'Тариф', html: id => `<select id="${id}" class="${cls.input}"><option value="basic">Basic</option><option value="pro">Pro</option><option value="team">Team</option></select>` },
+  ];
+  if (variant === 'reordered') {
+    fields.splice(0, 2, fields[1], { id: 'phone', label: 'Телефон', html: id => `<input id="${id}" class="${cls.input}">` }, fields[0]);
+  }
+  const rows = fields.map(f => {
+    const row = `<div class="${cls.row}"><label for="${f.id}">${f.label}</label>${f.html(f.id)}</div>`;
+    return variant === 'wrapped' ? `<div class="field-wrap"><div class="field-inner">${row}</div></div>` : row;
+  }).join('');
+  document.getElementById('root').innerHTML = `<div class="${cls.container} panel stack" style="max-width: 380px">
+      <h3>Подписка на курс</h3>${rows}
+      <button class="${cls.button} primary" type="button" id="submit">Подписаться</button>
+    </div>`;
+  document.getElementById('submit').addEventListener('click', () => {
+    const v = id => document.getElementById(id).value.trim();
+    if (v('name-input') === 'Иван' && v(cls.email) === 'ivan@test.ru' && v('plan') === 'pro') Lab.success('Подписка оформлена');
+    else Lab.fail('форма заполнена неверно');
+  });
+</script>
+{% endblock %}

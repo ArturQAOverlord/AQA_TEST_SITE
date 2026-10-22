@@ -1,0 +1,33 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Одностраничное приложение рисует кнопку «Продолжить» сразу, но обработчики подключаются только после
+  «гидратации» — через 1–3 секунды. Клик до этого момента засчитывается как провал.</p>
+<p>Визуально момент готовности никак не отмечен. Единственный признак — <code>window.app.ready === true</code>.</p>
+<p>Дождись готовности приложения и нажми «Продолжить».</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.wait_for_function("() => window.app && window.app.ready")</code></pre>
+<p>Функция выполняется в браузере и опрашивается, пока не вернёт truthy-значение. Это последнее средство:
+  если есть возможность, проси разработчиков добавить видимый признак готовности (атрибут, класс) и жди его через <code>expect</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 400px">
+  <h3>Добро пожаловать</h3>
+  <p class="muted">Нажми «Продолжить», чтобы начать.</p>
+  <button class="primary" id="go">Продолжить</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  window.app = { ready: false };
+  document.getElementById('go').addEventListener('click', () => {
+    if (!window.app.ready) return Lab.fail('клик до гидратации — приложение ещё не готово');
+    Lab.success('Приложение готово, продолжаем');
+  });
+  setTimeout(() => { window.app.ready = true; }, Lab.rand(1000, 3000));
+</script>
+{% endblock %}

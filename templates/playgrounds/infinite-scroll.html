@@ -1,0 +1,56 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Лента статей подгружается порциями по 10, когда ты докручиваешь до низа. Всего статей 50.</p>
+<p>Открой <b>«Статья №37»</b> — нажми «Читать» в её карточке.</p>
+<p>Пока статья не подгружена, её нет в DOM, и <code>click()</code> будет ждать впустую — сам Playwright
+  страницу не прокрутит.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Крути страницу, пока карточка не появится:</p>
+<pre><code>card = page.get_by_role("article").filter(has=page.get_by_role("heading", name="Статья №37", exact=True))
+while card.count() == 0:
+    page.mouse.wheel(0, 2000)
+    page.wait_for_timeout(300)</code></pre>
+<p>Вариант без «магических» пауз — прокручивать к индикатору загрузки:
+  <code>page.get_by_test_id("feed-sentinel").scroll_into_view_if_needed()</code> и ждать роста <code>count()</code>.
+  И не забудь про <code>exact=True</code>: «Статья №3» — подстрока «Статья №37».</p>
+{% endblock %}
+
+{% block content %}
+<h2>Лента</h2>
+<div id="feed"></div>
+<div data-testid="feed-sentinel" id="sentinel" style="padding: 16px; text-align: center" class="muted"><span class="spinner"></span> Загружаем ещё…</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const feed = document.getElementById('feed');
+  let loaded = 0, busy = false;
+  async function more() {
+    if (busy || loaded >= 50) return;
+    busy = true;
+    await Lab.sleep(Lab.rand(300, 600));
+    for (let i = 0; i < 10; i++) {
+      const n = ++loaded;
+      const art = document.createElement('article');
+      art.className = 'card stack';
+      art.style.marginBottom = '12px';
+      art.innerHTML = `<h3 style="margin:0">Статья №${n}</h3><p class="muted">Короткий анонс статьи номер ${n} про автотесты.</p><button>Читать</button>`;
+      art.querySelector('button').addEventListener('click', () => n === 37 ? Lab.success('Статья №37 открыта') : Lab.fail(`открыта статья №${n}`));
+      feed.appendChild(art);
+    }
+    if (loaded >= 50) document.getElementById('sentinel').textContent = 'Это всё';
+    busy = false;
+    check();
+  }
+  const io = new IntersectionObserver(entries => { if (entries[0].isIntersecting) more(); });
+  function check() {
+    // Перезапуск наблюдения: если индикатор после подгрузки всё ещё виден, сразу грузим следующую порцию
+    io.unobserve(document.getElementById('sentinel'));
+    io.observe(document.getElementById('sentinel'));
+  }
+  more().then(() => io.observe(document.getElementById('sentinel')));
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Три статьи в разных статусах, у каждой своя кнопка «Удалить». Удали статью со статусом <b>«Архив»</b>.</p>
+<p>Сначала специально напиши <code>page.get_by_role("button", name="Удалить").click()</code> и прочитай ошибку:</p>
+<pre><code>Error: strict mode violation: get_by_role("button", name="Удалить") resolved to 3 elements</code></pre>
+<p>Playwright отказывается угадывать, какой из трёх элементов ты имел в виду. Это не баг, а защита от ложнозелёных тестов.
+  Порядок карточек случайный.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Сузь поиск до карточки: <code>page.get_by_role("article").filter(has_text="Архив")</code>, а внутри неё уже ищи кнопку.</p>
+{% endblock %}
+
+{% block content %}
+<div class="grid" id="posts"></div>
+<p id="log" class="muted"></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  const posts = [
+    { title: 'Как писать локаторы', status: 'Черновик' },
+    { title: 'Итоги года', status: 'Опубликовано' },
+    { title: 'Старый релиз 1.0', status: 'Архив' },
+  ].sort(() => Math.random() - .5);
+  posts.forEach(p => {
+    const art = document.createElement('article');
+    art.className = 'card stack';
+    art.innerHTML = `<b>${p.title}</b><span class="badge">${p.status}</span><button class="danger">Удалить</button>`;
+    art.querySelector('button').addEventListener('click', () => {
+      art.remove();
+      document.getElementById('log').textContent = 'Удалено: ' + p.title;
+      if (p.status === 'Архив') Lab.success('Архивная статья удалена');
+      else Lab.fail('Удалена статья со статусом ' + p.status);
+    });
+    document.getElementById('posts').appendChild(art);
+  });
+</script>
+{% endblock %}

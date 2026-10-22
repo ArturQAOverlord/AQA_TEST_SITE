@@ -1,0 +1,44 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Канбан-доска. Перетащи карточку <b>«Написать автотесты»</b> из колонки To Do в колонку <b>Done</b>.</p>
+<p>Колонки помечены <code>data-testid="column-todo"</code>, <code>column-progress</code>, <code>column-done</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>page.get_by_text("Написать автотесты").drag_to(page.get_by_test_id("column-done"))</code></pre>
+<p>Если библиотека drag-and-drop капризная, можно вручную:
+  <code>hover()</code> → <code>page.mouse.down()</code> → <code>hover()</code> на цель → <code>page.mouse.up()</code>.</p>
+{% endblock %}
+
+{% block content %}
+<div class="row" style="align-items: stretch">
+  {% for id, title, cards in [("todo", "To Do", ["Написать автотесты", "Обновить README"]), ("progress", "In Progress", ["Починить флейки"]), ("done", "Done", ["Настроить CI"])] %}
+  <div class="panel col" data-testid="column-{{ id }}" data-col="{{ id }}" style="flex: 1; min-height: 240px">
+    <h3>{{ title }}</h3>
+    {% for c in cards %}<div class="card" draggable="true" style="margin-bottom: 8px; cursor: grab">{{ c }}</div>{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let dragged = null;
+  document.querySelectorAll('[draggable]').forEach(card => {
+    card.addEventListener('dragstart', e => { dragged = card; e.dataTransfer.setData('text/plain', card.textContent); });
+  });
+  document.querySelectorAll('.col').forEach(col => {
+    col.addEventListener('dragover', e => e.preventDefault());
+    col.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragged) return;
+      col.appendChild(dragged);
+      const title = dragged.textContent.trim();
+      if (title === 'Написать автотесты' && col.dataset.col === 'done') Lab.success('Автотесты написаны!');
+      else if (title === 'Написать автотесты') Lab.fail('Карточка в колонке ' + col.dataset.col);
+      dragged = null;
+    });
+  });
+</script>
+{% endblock %}

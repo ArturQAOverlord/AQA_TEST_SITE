@@ -1,0 +1,46 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Страница читает фича-флаги из <code>window.__LAB_FLAGS__</code> <b>в момент загрузки</b>, ещё до того, как
+  тест успеет что-либо сделать через <code>evaluate</code>.</p>
+<p>Включи флаг <code>newCheckout: true</code>, открой страницу и нажми «Новое оформление заказа».
+  Кроме того, страница показывает «счастливое число» из <code>Math.random()</code> — сделай так, чтобы оно было
+  <b>ровно 42</b> (подмени <code>Math.random</code>, чтобы он всегда возвращал 0.42).</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>add_init_script</code> выполняет код в каждом новом документе <b>до</b> скриптов страницы:</p>
+<pre><code>page.add_init_script("""
+    window.__LAB_FLAGS__ = { newCheckout: true };
+    Math.random = () => 0.42;
+""")
+page.goto("/play/init-script")</code></pre>
+<p>Так же в тестах «замораживают» случайность, отключают анимации и подсовывают заглушки сторонних SDK.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <h3>Корзина</h3>
+  <p>Счастливое число дня: <b data-testid="lucky" id="lucky"></b></p>
+  <div id="checkout"></div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const flags = window.__LAB_FLAGS__ || {};
+  const lucky = Math.floor(Math.random() * 100);
+  document.getElementById('lucky').textContent = lucky;
+  const box = document.getElementById('checkout');
+  if (flags.newCheckout) {
+    box.innerHTML = '<button class="primary" id="new">Новое оформление заказа</button>';
+    document.getElementById('new').addEventListener('click', () => {
+      if (lucky !== 42) return Lab.fail(`счастливое число ${lucky}, а нужно 42`);
+      Lab.success('Новый checkout с предсказуемым числом');
+    });
+  } else {
+    box.innerHTML = '<button id="old">Оформить заказ</button>';
+    document.getElementById('old').addEventListener('click', () => Lab.fail('это старое оформление — флаг не включён'));
+  }
+</script>
+{% endblock %}

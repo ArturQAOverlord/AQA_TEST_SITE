@@ -1,0 +1,47 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Оформи подписку: выбери тариф <b>Pro</b>, введи email <code>me@aqa.lab</code>, нажми «Оформить» и проверь
+  сообщение «Подписка Pro оформлена».</p>
+<p>Главное — отчёт. Разбей тест минимум на <b>3 шага</b> <code>with allure.step("…")</code> и приложи к отчёту скриншот
+  страницы через <code>allure.attach</code>. Проверка задания разбирает код теста.</p>
+<p>Запуск с отчётом: <code>pytest exercises -k allure --alluredir=allure-results</code>, просмотр:
+  <code>allure serve allure-results</code> (нужен <a href="https://allurereport.org/docs/install/" target="_blank">Allure CLI</a>).</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>import allure
+
+with allure.step("Выбрать тариф Pro"):
+    ...
+allure.attach(page.screenshot(), name="Итог", attachment_type=allure.attachment_type.PNG)</code></pre>
+<p>Шаги можно вкладывать друг в друга, а методы Page Object — помечать декоратором <code>@allure.step("Войти как {username}")</code>,
+  тогда шаги появятся в отчёте сами.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel stack" id="form" style="max-width: 400px">
+  <h3>Подписка</h3>
+  <fieldset style="border:0; padding:0">
+    <legend class="muted">Тариф</legend>
+    <label class="inline"><input type="radio" name="plan" value="Basic" checked> Basic</label>
+    <label class="inline"><input type="radio" name="plan" value="Pro"> Pro</label>
+  </fieldset>
+  <div class="field"><label for="email">Email</label><input id="email" type="email"></div>
+  <button class="primary" type="submit">Оформить</button>
+  <p class="ok" role="status" id="done"></p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const plan = document.querySelector('[name=plan]:checked').value;
+    const email = document.getElementById('email').value.trim();
+    if (plan !== 'Pro' || email !== 'me@aqa.lab') return Lab.fail('подписка оформлена с другими данными');
+    document.getElementById('done').textContent = `Подписка ${plan} оформлена`;
+    Lab.success('Подписка оформлена');
+  });
+</script>
+{% endblock %}

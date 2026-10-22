@@ -1,0 +1,50 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Коллега написал тест, который то проходит, то падает:</p>
+<pre><code>def test_tasks(page):
+    page.goto("/play/flaky-fix")
+    page.get_by_role("button", name="Загрузить задачи").click()
+    time.sleep(1)
+    for checkbox in page.get_by_role("checkbox").all():
+        checkbox.check()
+    page.get_by_role("button", name="Готово").click()</code></pre>
+<p>Задачи подгружаются <b>по одной</b> со случайными паузами, всего их <b>5</b>. Через секунду на странице может быть
+  и 1, и 3 задачи — тогда «Готово» засчитает провал.</p>
+<p>Напиши стабильную версию: отметь все 5 задач и нажми «Готово». Без <code>sleep</code>.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>.all()</code> не ждёт — он возвращает то, что есть на странице прямо сейчас. Сначала дождись нужного
+  состояния web-first проверкой, а потом уже перебирай элементы:</p>
+<pre><code>checkboxes = page.get_by_role("checkbox")
+expect(checkboxes).to_have_count(5)</code></pre>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <button id="load">Загрузить задачи</button>
+  <ul class="plain" id="list"></ul>
+  <button class="primary" id="done">Готово</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const TOTAL = 5;
+  document.getElementById('load').addEventListener('click', async e => {
+    e.target.disabled = true;
+    for (let i = 1; i <= TOTAL; i++) {
+      await Lab.sleep(Lab.rand(200, 900));
+      const li = document.createElement('li');
+      li.innerHTML = `<label class="inline"><input type="checkbox"> Задача ${i}</label>`;
+      document.getElementById('list').appendChild(li);
+    }
+  });
+  document.getElementById('done').addEventListener('click', () => {
+    const checked = document.querySelectorAll('#list input:checked').length;
+    if (checked === TOTAL) Lab.success('Все 5 задач отмечены — тест стабилен');
+    else Lab.fail(`Отмечено ${checked} из ${TOTAL} — классический флейк`);
+  });
+</script>
+{% endblock %}

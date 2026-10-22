@@ -1,0 +1,45 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Этот тест то проходит, то падает — в зависимости от нагрузки на стенд:</p>
+<pre><code>def test_fix_sleeps(page: Page):
+    page.goto("/play/fix-sleeps")
+    page.click("text=Сгенерировать")
+    time.sleep(2)
+    assert page.locator(".result").is_visible()
+    page.click("text=Скачать")</code></pre>
+<p>По требованиям генерация отчёта занимает <b>до 9 секунд</b>. Перепиши тест без <code>sleep</code>,
+  <code>wait_for_timeout</code> и <code>is_visible()</code>, чтобы он был и стабильным, и быстрым. Проверка прогонит его на
+  быстром, медленном и очень медленном сервере и разберёт код.</p>
+{% endblock %}
+
+{% block hint %}
+<p>Web-first проверка с таймаутом под требование: <code>expect(result).to_be_visible(timeout=10_000)</code>.
+  Она ждёт ровно столько, сколько нужно: на быстром сервере тест не будет зря стоять 2 секунды.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 400px">
+  <h3>Отчёт по тестам</h3>
+  <button class="primary" id="gen">Сгенерировать</button>
+  <div id="progress" class="hidden"><span class="spinner"></span> Генерация…</div>
+  <div class="result hidden" id="result">
+    <p class="ok">Отчёт готов: 42 страницы</p>
+    <button id="download">Скачать</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const delay = { slow: 4000, 'very-slow': 8000, fast: 200 }[Lab.mutant] ?? 1500;
+  document.getElementById('gen').addEventListener('click', async e => {
+    e.target.disabled = true;
+    document.getElementById('progress').classList.remove('hidden');
+    await Lab.sleep(delay);
+    document.getElementById('progress').classList.add('hidden');
+    document.getElementById('result').classList.remove('hidden');
+  });
+  document.getElementById('download').addEventListener('click', () => Lab.success('Отчёт скачан'));
+</script>
+{% endblock %}

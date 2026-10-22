@@ -1,0 +1,40 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Нажми «Сформировать отчёт». Генерация занимает около <b>7 секунд</b>.</p>
+<p>Проверь через <code>expect</code>, что появилась надпись <b>«Отчёт готов»</b>, и после этого нажми «Скачать отчёт».</p>
+<p>У <code>expect</code> таймаут по умолчанию — 5 секунд, так что «в лоб» проверка упадёт.</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>expect(page.get_by_text("Отчёт готов")).to_be_visible(timeout=10_000)</code></pre>
+<p>Глобально таймаут меняют через <code>expect.set_options(timeout=...)</code>, а для действий —
+  <code>page.set_default_timeout(...)</code>. Но лучше увеличивать таймаут точечно, там, где это действительно нужно.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 420px">
+  <button class="primary" id="gen">Сформировать отчёт</button>
+  <div id="progress" class="hidden"><span class="spinner"></span> <span id="pct">0%</span></div>
+  <div id="ready" class="hidden">
+    <p class="ok">Отчёт готов</p>
+    <button id="download">Скачать отчёт</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('gen').addEventListener('click', async e => {
+    e.target.disabled = true;
+    document.getElementById('progress').classList.remove('hidden');
+    for (let i = 1; i <= 7; i++) {
+      await Lab.sleep(1000);
+      document.getElementById('pct').textContent = Math.round(i / 7 * 100) + '%';
+    }
+    document.getElementById('progress').classList.add('hidden');
+    document.getElementById('ready').classList.remove('hidden');
+  });
+  document.getElementById('download').addEventListener('click', () => Lab.success('Отчёт скачан'));
+</script>
+{% endblock %}

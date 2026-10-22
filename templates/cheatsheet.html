@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Шпаргалка по Playwright — AQA Lab{% endblock %}
+{% block content %}
+<div class="cheat">
+<h1>Шпаргалка: Playwright + pytest</h1>
+<p class="lead">Самое нужное API, сгруппированное по задачам. У каждой строки — миссии, где это тренируется.</p>
+
+{% set sections = [
+  ("Локаторы", [
+    ('page.get_by_role("button", name="Сохранить")', "Элемент по роли и доступному имени. Лучший выбор по умолчанию.", ["first-click", "role-disambiguation", "accordion"]),
+    ('get_by_text("…", exact=True)', "По тексту. Без exact — подстрока без учёта регистра.", ["by-text", "exact-match"]),
+    ('get_by_label("Email")', "Поле по подписи: label for, вложенный label, aria-label, aria-labelledby.", ["by-label", "dynamic-ids"]),
+    ('get_by_placeholder / get_by_alt_text / get_by_title', "Поля без подписи, картинки, иконки.", ["by-placeholder", "alt-title"]),
+    ('get_by_test_id("plan-pro")', "Атрибут data-testid — стабильный контракт с разработчиками.", ["test-id"]),
+    ('locator.filter(has_text=…, has=…, has_not=…)', "Оставить элементы с нужным текстом или вложенным элементом.", ["filter-has-text", "filter-has", "table"]),
+    ('a.and_(b) / a.or_(b)', "Пересечение и объединение локаторов.", ["and-or"]),
+    ('.first / .last / .nth(i)', "Позиционный выбор — крайняя мера.", ["nth-first-last"]),
+    ('page.locator("css=…") / ("xpath=…")', "Когда семантики нет совсем.", ["css-xpath", "bad-markup"]),
+    ('page.frame_locator("iframe[title=…]")', "Элементы внутри iframe, можно вкладывать.", ["iframe", "nested-iframes"]),
+  ]),
+  ("Действия", [
+    ('fill / press_sequentially', "fill вставляет значение целиком; press_sequentially печатает по клавише.", ["login-form", "press-sequentially"]),
+    ('click / dblclick / click(button="right")', "Клики. Перед действием Playwright сам ждёт actionability.", ["click-variants", "actionability"]),
+    ('press("Enter") / keyboard.press("Control+K")', "Клавиши и сочетания.", ["keyboard", "keyboard-listbox", "custom-slider"]),
+    ('check / uncheck / set_checked', "Идемпотентная работа с чекбоксами и радио.", ["checkbox-radio", "all-elements"]),
+    ('select_option(label=…)', "Нативный select, в том числе multiple.", ["select-option"]),
+    ('hover / drag_to / page.mouse', "Наведение, перетаскивание, рисование координатами.", ["hover-menu", "drag-and-drop", "canvas-draw"]),
+    ('set_input_files / expect_file_chooser / expect_download', "Загрузка и скачивание файлов.", ["file-upload", "download"]),
+    ('page.on("dialog", …) / expect_popup', "Нативные диалоги и новые вкладки.", ["dialogs", "new-tab"]),
+    ('scroll_into_view_if_needed / mouse.wheel', "Прокрутка ленты и виртуальных списков.", ["infinite-scroll", "virtual-list"]),
+  ]),
+  ("Ожидания", [
+    ('expect(locator).to_be_visible(timeout=10_000)', "Web-first проверка с собственным таймаутом.", ["custom-timeout", "wait-appear"]),
+    ('expect(page).to_have_url(re.compile(…))', "Ожидание редиректа.", ["wait-url"]),
+    ('with page.expect_response("**/api/x") as info', "Поймать ответ, который вызывает действие.", ["wait-response"]),
+    ('with page.expect_request(…) as info', "Проверить, что ушло на сервер.", ["wait-request", "count-requests"]),
+    ('page.wait_for_function("() => …")', "Ждать условия в JS, если в DOM его не видно.", ["wait-for-function"]),
+    ('page.add_locator_handler(…)', "Автоматически закрывать непредсказуемые попапы.", ["random-popup"]),
+  ]),
+  ("Проверки", [
+    ('to_have_text / to_contain_text', "Точный текст (строка, regex, список) или подстрока.", ["text-assertions", "stale-elements"]),
+    ('to_have_count / to_have_value / to_be_empty', "Количество элементов, значение поля.", ["count-assertions", "value-assertions"]),
+    ('to_have_attribute / to_have_class / to_have_css', "Атрибуты, классы, вычисленные стили.", ["attribute-assertions", "css-assertions"]),
+    ('to_be_enabled / to_be_checked / to_be_editable', "Состояния элементов.", ["state-assertions"]),
+    ('not_to_be_visible / to_be_hidden / not_to_be_attached', "Отрицания, которые ждут.", ["negative-assertions", "toast"]),
+    ('to_have_accessible_name / to_have_role', "Доступность.", ["a11y-assertions"]),
+    ('to_match_aria_snapshot("""…""")', "Структура блока одним снимком.", ["aria-snapshot"]),
+    ('expect(response).to_be_ok() / page.request', "API-проверки без браузера.", ["api-assertions"]),
+  ]),
+  ("Сеть", [
+    ('page.route("**/api/x", lambda r: r.abort())', "Заблокировать запрос. Регистрировать до goto.", ["block-requests"]),
+    ('route.fulfill(status=500, json=[…])', "Подменить ответ целиком.", ["mock-500", "mock-data", "mock-empty"]),
+    ('route.fetch() + route.fulfill(response=…, json=…)', "Изменить поле в настоящем ответе.", ["modify-response"]),
+    ('route.continue_(url=…, headers=…)', "Изменить запрос на лету.", ["modify-request", "auth-header"]),
+    ('page.route_web_socket(…) / page.on("websocket")', "Мок и наблюдение за WebSocket.", ["websocket-mock", "websocket-frames"]),
+    ('page.route_from_har(path, update=True)', "Записать и воспроизвести ответы API.", ["har-replay"]),
+  ]),
+  ("Контекст браузера", [
+    ('context.add_cookies / storage_state(path=…)', "Cookies и перенос сессии между контекстами.", ["cookies", "storage-state"]),
+    ('page.add_init_script("…")', "Код до скриптов страницы: флаги, заглушки, Math.random.", ["init-script"]),
+    ('set_viewport_size / emulate_media(color_scheme="dark")', "Мобильная вёрстка и тёмная тема.", ["mobile-viewport", "color-scheme"]),
+    ('grant_permissions / set_geolocation / set_offline', "Разрешения, геолокация, офлайн.", ["geolocation", "offline-sw"]),
+    ('page.clock.install / pause_at / fast_forward', "Управление временем.", ["clock"]),
+    ('browser.new_context(**browser_context_args)', "Второй пользователь в том же тесте.", ["multi-user-chat"]),
+  ]),
+  ("pytest", [
+    ('@pytest.mark.parametrize(…, ids=[…])', "Один тест — много случаев.", ["parametrize", "bug-boundary"]),
+    ('@pytest.fixture', "Подготовка окружения: вход через API, данные.", ["fixtures"]),
+    ('@pytest.mark.smoke + pytest -m smoke', "Маркеры и запуск подмножества тестов.", ["markers"]),
+    ('pytest -n 4', "Параллельный запуск (pytest-xdist): тесты должны быть независимы.", ["isolation"]),
+    ('--tracing retain-on-failure / playwright show-trace', "Разбор упавших тестов.", ["trace-debug"]),
+    ('with allure.step(…) / allure.attach(…)', "Читаемые отчёты.", ["allure-steps"]),
+  ]),
+] %}
+
+{% for title, rows in sections %}
+<h2>{{ title }}</h2>
+<table>
+  <thead><tr><th>Код</th><th>Зачем</th><th>Миссии</th></tr></thead>
+  <tbody>
+    {% for code, text, slugs in rows %}
+    <tr>
+      <td><code>{{ code }}</code></td>
+      <td>{{ text }}</td>
+      <td>{% for s in slugs %}<a href="{{ url_for('mission_page', slug=s) }}">{{ missions_by_slug[s].title }}</a>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<h2>Запуск</h2>
+<table>
+  <tbody>
+    <tr><td><code>pytest exercises --headed --slowmo 300</code></td><td>Смотреть, что делает тест.</td></tr>
+    <tr><td><code>pytest exercises -k first_click</code></td><td>Один тест по имени.</td></tr>
+    <tr><td><code>PWDEBUG=1 pytest …</code></td><td>Playwright Inspector: пошаговое выполнение и подбор локаторов.</td></tr>
+    <tr><td><code>playwright codegen http://127.0.0.1:5000/play/first-click</code></td><td>Записать действия и подсмотреть локаторы.</td></tr>
+    <tr><td><code>playwright show-trace test-results/…/trace.zip</code></td><td>Trace упавшего теста (сохраняется автоматически, см. pytest.ini).</td></tr>
+    <tr><td><code>pytest exercises --video retain-on-failure</code></td><td>Видео упавших тестов.</td></tr>
+    <tr><td><code>pytest exercises --alluredir=allure-results</code></td><td>Данные для Allure-отчёта.</td></tr>
+    <tr><td><code>python verify.py &lt;миссия&gt;</code></td><td>Проверка теста мутантами, редизайнами и разбором кода.</td></tr>
+  </tbody>
+</table>
+</div>
+{% endblock %}

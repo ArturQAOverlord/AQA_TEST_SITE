@@ -1,0 +1,56 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Нажми «Оформить заказ» и проверь результат:</p>
+<ol>
+  <li>Сообщение (<code>role="alert"</code>) <b>целиком</b> имеет вид «Заказ №<i>пять цифр</i> успешно оформлен».
+    Номер случайный.</li>
+  <li>Сообщение <b>содержит</b> подстроку «успешно оформлен».</li>
+  <li>Список «Что дальше» состоит ровно из трёх пунктов с текстами
+    «Мы соберём заказ», «Курьер позвонит заранее», «Оплата при получении» — именно в этом порядке.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<ul>
+  <li><code>to_have_text</code> — полное совпадение, принимает строку или <code>re.compile(...)</code>.
+    Для строки пробелы нормализуются, а вот регулярка применяется к тексту <b>как есть</b>. В этом сообщении есть
+    пробелы по краям, так что <code>^Заказ...$</code> не сработает — учти их через <code>\s*</code>.</li>
+  <li><code>to_contain_text</code> — подстрока.</li>
+  <li>Если передать <b>список</b> в <code>to_have_text</code>, он сравнит тексты всех найденных элементов по порядку:
+    <code>expect(page.get_by_role("listitem")).to_have_text([...])</code>.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 460px">
+  <h3>Корзина: 2 товара на 4 380 ₽</h3>
+  <button class="primary" id="order">Оформить заказ</button>
+  <div id="result" class="hidden">
+    <p role="alert" class="ok" id="msg"></p>
+    <h4>Что дальше</h4>
+    <ul id="next">
+      <li>Мы соберём заказ</li>
+      <li>Курьер позвонит   заранее</li>
+      <li>Оплата при получении</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.getElementById('order').addEventListener('click', e => {
+    e.target.disabled = true;
+    const num = Lab.mutant === 'short-number' ? Lab.rand(1000, 9999) : Lab.rand(10000, 99999);
+    const word = Lab.mutant === 'typo' ? 'оформлн' : 'оформлен';
+    document.getElementById('msg').textContent = `  Заказ №${num} успешно ${word} `;
+    if (Lab.mutant === 'list-order') {
+      const ul = document.getElementById('next');
+      ul.insertBefore(ul.children[1], ul.children[0]);
+    }
+    document.getElementById('result').classList.remove('hidden');
+    Lab.success('Заказ оформлен — проверь тексты');
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Форма регистрации проверяет пароль по правилам — по порядку, показывая первую найденную ошибку:</p>
+<ol>
+  <li>длина меньше 8 → «Минимум 8 символов»;</li>
+  <li>есть пробел → «Пароль не должен содержать пробелы»;</li>
+  <li>нет цифры → «Нужна хотя бы одна цифра»;</li>
+  <li>нет заглавной буквы → «Нужна заглавная буква»;</li>
+  <li>нет спецсимвола (<code>!@#$%^&amp;*</code>) → «Нужен спецсимвол»;</li>
+  <li>иначе → «Аккаунт создан».</li>
+</ol>
+<p>Напиши <b>один</b> тест с <code>@pytest.mark.parametrize</code> на 6 случаев: для каждого правила — пароль, который
+  нарушает именно его, плюс один валидный. Каждый случай проверяет точный текст сообщения.</p>
+<p>Миссия засчитывается, когда покрыты все 6 исходов (сервер собирает их из разных запусков страницы).</p>
+{% endblock %}
+
+{% block hint %}
+<pre><code>@pytest.mark.parametrize(
+    ("password", "message"),
+    [
+        ("Ab1!", "Минимум 8 символов"),
+        ...
+        ("Abcdefg1!", "Аккаунт создан"),
+    ],
+)
+def test_parametrize(page: Page, password: str, message: str):
+    ...</code></pre>
+<p>Подбирая пароль, проверь, что он не нарушает правила, стоящие <b>выше</b> по списку, — иначе сработает другое сообщение.
+  Добавь <code>ids=[...]</code>, чтобы в отчёте pytest случаи назывались по-человечески.</p>
+{% endblock %}
+
+{% block content %}
+<form class="panel" style="max-width: 380px" id="form" novalidate>
+  <h3>Регистрация</h3>
+  <div class="field"><label for="pwd">Пароль</label><input id="pwd" type="text" autocomplete="off"></div>
+  <p role="alert" id="msg"></p>
+  <button class="primary" type="submit">Создать аккаунт</button>
+  <p class="muted" id="coverage"></p>
+</form>
+{% endblock %}
+
+{% block script %}
+<script>
+  const rules = [
+    ['length', p => p.length < 8, 'Минимум 8 символов'],
+    ['spaces', p => /\s/.test(p), 'Пароль не должен содержать пробелы'],
+    ['digit', p => !/\d/.test(p), Lab.mutant === 'digit-message' ? 'Добавьте число' : 'Нужна хотя бы одна цифра'],
+    ['upper', p => !/[A-ZА-ЯЁ]/.test(p), 'Нужна заглавная буква'],
+    ['special', p => !/[!@#$%^&*]/.test(p), 'Нужен спецсимвол'],
+  ];
+  let submitted = false;
+  document.getElementById('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (submitted) return Lab.fail('один случай — одна отправка формы');
+    submitted = true;
+    const p = document.getElementById('pwd').value;
+    const broken = rules.find(([, test]) => test(p));
+    const msg = document.getElementById('msg');
+    msg.className = broken ? 'error' : 'ok';
+    msg.textContent = broken ? broken[2] : 'Аккаунт создан';
+    const part = broken ? broken[0] : 'valid';
+    const res = await Lab.part(part, rules.length + 1);
+    document.getElementById('coverage').textContent = `Покрыто исходов: ${res.covered.length} из ${res.total}`;
+    Lab.success(`Случай «${part}» покрыт (${res.covered.length}/${res.total})`, { record: false });
+  });
+</script>
+{% endblock %}

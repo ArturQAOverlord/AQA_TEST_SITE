@@ -1,0 +1,34 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Новый редактор доступен только бета-тестерам: страница проверяет cookie <code>beta=on</code> при загрузке.</p>
+<ol>
+  <li>Добавь в контекст браузера cookie <code>beta=on</code> для адреса сайта <b>до</b> открытия страницы.</li>
+  <li>Открой страницу и нажми «Попробовать новый редактор».</li>
+  <li>Проверь через <code>page.context.cookies()</code>, что cookie на месте.</li>
+</ol>
+{% endblock %}
+
+{% block hint %}
+<pre><code>def test_cookies(page: Page, base_url: str):
+    page.context.add_cookies([{"name": "beta", "value": "on", "url": base_url}])</code></pre>
+<p>Cookie нужно привязать либо к <code>url</code>, либо к паре <code>domain</code> + <code>path</code>.
+  Фикстура <code>base_url</code> приходит из pytest-base-url (её ставит pytest-playwright).</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 440px" id="box"></div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const beta = /(?:^|;\s*)beta=on(?:;|$)/.test(document.cookie);
+  const box = document.getElementById('box');
+  if (beta) {
+    box.innerHTML = '<span class="badge green">BETA</span><h3>Добро пожаловать в бету!</h3><button class="primary" id="try">Попробовать новый редактор</button>';
+    document.getElementById('try').addEventListener('click', () => Lab.success('Бета-редактор открыт'));
+  } else {
+    box.innerHTML = '<h3>Редактор</h3><p class="muted">Бета-функции недоступны для вашего аккаунта.</p>';
+  }
+</script>
+{% endblock %}

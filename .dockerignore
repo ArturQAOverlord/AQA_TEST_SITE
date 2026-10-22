@@ -1,0 +1,12 @@
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
+test-results
+allure-results
+**/__snapshots__
+progress.json
+verified.json

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Playwright Python Lab</h1>
+  <p class="lead">
+    {{ total }} миссий для прокачки локаторов, действий, ожиданий, assertions, перехвата сети и работы с контекстом браузера.
+    Каждая миссия — маленькая страница-песочница, на которую ты пишешь автотест на <b>pytest + Playwright</b>.
+  </p>
+  {% set solved = progress | length %}
+  <div class="progress-box">
+    <div class="progress-label"><b>{{ solved }} / {{ total }}</b> решено автотестами</div>
+    <div class="progress-bar"><div class="progress-fill" style="width: {{ (solved / total * 100) | round(1) }}%"></div></div>
+    {% if solved or verified %}<button class="btn-ghost" id="reset-progress" type="button">Сбросить прогресс</button>{% endif %}
+  </div>
+</section>
+
+<section class="how" id="how">
+  <h2>Как пользоваться</h2>
+  <ol class="steps">
+    <li><b>Запусти сайт:</b> <code>python app.py</code> — он будет доступен на <code>http://127.0.0.1:5000</code>.</li>
+    <li><b>Открой миссию</b>, прочитай задание и потыкай песочницу руками — она открывается по адресу <code>/play/&lt;миссия&gt;</code>.</li>
+    <li><b>Напиши тест</b> в папке <code>exercises/</code>, начиная со стартового шаблона со страницы миссии.</li>
+    <li><b>Запусти:</b> <code>pytest exercises --headed</code>. Когда тест доводит миссию до конца, песочница показывает статус
+      <code>data-status="success"</code>, а миссия здесь становится зелёной.</li>
+    <li><b>Проверь тест глубже:</b> у миссий с пометками 🧬 🔍 🛠 📐 нажми «Запустить проверку» на странице миссии
+      (или <code>python verify.py &lt;миссия&gt;</code>) — тест прогонится на других версиях страницы.</li>
+    <li>Застрял — открой подсказку. Совсем застрял — эталонное решение (его же можно запустить: <code>pytest tests</code>).</li>
+  </ol>
+  <details class="rules">
+    <summary>Что считается провалом попытки</summary>
+    <ul>
+      <li>Любое неверное действие (не тот элемент, не те данные) — провал окончательный: чтобы попробовать снова, нужна новая загрузка страницы.
+        Тест, который «кликает всё подряд», миссию не пройдёт.</li>
+      <li>Синтетические события: <code>dispatch_event("click")</code>, <code>el.click()</code> через <code>evaluate</code>.
+        Песочница принимает только настоящие клики и нажатия клавиш Playwright.</li>
+      <li>Подмена статуса миссии через <code>evaluate</code>.</li>
+      <li>Обход сценария: прямой переход на страницу результата, клик через <code>force=True</code> по движущемуся или перекрытому элементу и т.п.</li>
+    </ul>
+  </details>
+  <p class="muted">Не знаешь, с чего начать? Выбери трек ниже или загляни в <a href="{{ url_for('cheatsheet') }}">шпаргалку по API</a>.</p>
+</section>
+
+<section id="tracks">
+  <h2>Треки</h2>
+  <div class="cards tracks">
+    {% for track in tracks %}
+    {% set done = track.slugs | select('in', progress) | list | length %}
+    <a class="card" href="{{ url_for('track_page', track_id=track.id) }}">
+      <div class="card-title">{{ track.title }}</div>
+      <div class="card-summary">{{ track.description }}</div>
+      <div class="progress-bar small"><div class="progress-fill" style="width: {{ (done / (track.slugs | length) * 100) | round(1) }}%"></div></div>
+      <div class="card-foot"><span>{{ track.slugs | length }} миссий</span><span>{{ done }} / {{ track.slugs | length }}</span></div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="filters" id="filters">
+  <span class="muted">Сложность:</span>
+  {% for level in ["all", "Intro", "Easy", "Medium", "Hard"] %}
+  <button type="button" class="chip" data-level="{{ level }}">{{ "Все" if level == "all" else level }}</button>
+  {% endfor %}
+  <label class="inline muted"><input type="checkbox" id="unsolved"> только нерешённые</label>
+</div>
+
+<section id="catalog">
+  {% for category, missions in groups %}
+  {% set done = missions | selectattr('slug', 'in', progress) | list | length %}
+  <div class="category" id="cat-{{ category.id }}">
+    <div class="category-head">
+      <h2>{{ category.title }}</h2>
+      <span class="category-count">{{ done }} / {{ missions | length }}</span>
+    </div>
+    <p class="muted">{{ category.description }}</p>
+    <details class="theory">
+      <summary>📖 Теория (2 минуты)</summary>
+      <div class="prose">{% include "theory/" ~ category.id ~ ".html" ignore missing %}</div>
+    </details>
+    <div class="cards">
+      {% for m in missions %}
+      {% set v = verified.get(m.slug) %}
+      <a class="card {% if m.slug in progress %}card-done{% endif %}" href="{{ url_for('mission_page', slug=m.slug) }}"
+         data-level="{{ m.level }}" data-solved="{{ 'yes' if m.slug in progress else 'no' }}">
+        <div class="card-top">
+          <span class="card-num">#{{ loop.index }}</span>
+          <span class="level level-{{ m.level | lower }}">{{ m.level }}</span>
+        </div>
+        <div class="card-title">{{ m.title }}</div>
+        <div class="card-summary">{{ m.summary }}</div>
+        <div class="card-foot">
+          <span>~{{ m.minutes }} мин
+            {%- if m.kind == "bug" %} · 🔍{% elif m.kind == "robust" %} · 🛠{% elif m.mutants %} · 🧬 {{ m.mutants | length }}{% endif %}
+            {%- if m.static_check %} · 📐{% endif %}</span>
+          {% if v and not v.ok %}<span class="warn-mark">⚠ проверка</span>
+          {% elif v %}<span class="done-mark">✓ проверено</span>
+          {% elif m.slug in progress %}<span class="done-mark">✓ решено</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('reset-progress')?.addEventListener('click', async () => {
+    if (!confirm('Сбросить весь прогресс и результаты проверки мутантами?')) return;
+    await fetch('/api/progress', { method: 'DELETE' });
+    location.reload();
+  });
+
+  const state = { level: 'all', unsolved: false };
+  try { Object.assign(state, JSON.parse(localStorage.getItem('lab-filters') || '{}')); } catch {}
+  function apply() {
+    document.querySelectorAll('#filters .chip').forEach(c => c.classList.toggle('active', c.dataset.level === state.level));
+    document.getElementById('unsolved').checked = state.unsolved;
+    document.querySelectorAll('.cards .card').forEach(card => {
+      const hide = (state.level !== 'all' && card.dataset.level !== state.level) || (state.unsolved && card.dataset.solved === 'yes');
+      card.classList.toggle('hidden', hide);
+    });
+    document.querySelectorAll('.category').forEach(cat => {
+      cat.classList.toggle('hidden', !cat.querySelector('.card:not(.hidden)'));
+    });
+    try { localStorage.setItem('lab-filters', JSON.stringify(state)); } catch {}
+  }
+  document.querySelectorAll('#filters .chip').forEach(c => c.addEventListener('click', () => { state.level = c.dataset.level; apply(); }));
+  document.getElementById('unsolved').addEventListener('change', e => { state.unsolved = e.target.checked; apply(); });
+  apply();
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "play.html" %}
+
+{% block brief %}
+<p>Простой WYSIWYG-редактор: поле «Текст статьи» — это <code>&lt;div contenteditable&gt;</code>, а не textarea.</p>
+<ol>
+  <li>Введи текст <code>Playwright рулит</code>.</li>
+  <li>Выдели весь текст в редакторе (<kbd>Control</kbd>+<kbd>A</kbd>) и нажми кнопку «Жирный».</li>
+  <li>Нажми «Опубликовать».</li>
+</ol>
+<p>Засчитывается, только если опубликован ровно этот текст и он <b>целиком</b> жирный.</p>
+{% endblock %}
+
+{% block hint %}
+<p><code>fill()</code> работает и с contenteditable. Выделение: <code>editor.press("Control+A")</code> — внутри
+  contenteditable оно выделит только содержимое редактора. Кнопку панели инструментов нажимай обычным <code>click()</code>:
+  она сделана так, чтобы не забирать фокус и не сбрасывать выделение.</p>
+{% endblock %}
+
+{% block content %}
+<div class="panel stack" style="max-width: 520px">
+  <div class="row">
+    <button id="bold" aria-label="Жирный" aria-pressed="false"><b>B</b></button>
+    <button id="italic" aria-label="Курсив"><i>I</i></button>
+  </div>
+  <div contenteditable="true" role="textbox" aria-multiline="true" aria-label="Текст статьи" id="editor"
+       style="min-height:100px; border:1px solid #c9d1e0; border-radius:8px; padding:10px; background:#fff"></div>
+  <button class="primary" id="publish">Опубликовать</button>
+  <div id="preview" class="muted"></div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  const editor = document.getElementById('editor');
+  // mousedown.preventDefault — чтобы клик по кнопке не уводил фокус из редактора и не сбрасывал выделение
+  ['bold', 'italic'].forEach(cmd => {
+    const b = document.getElementById(cmd);
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', () => document.execCommand(cmd));
+  });
+  document.getElementById('publish').addEventListener('click', () => {
+    const text = editor.textContent.trim();
+    document.getElementById('preview').innerHTML = 'Опубликовано: ' + editor.innerHTML;
+    const boldText = [...editor.querySelectorAll('b, strong')].map(b => b.textContent).join('').trim();
+    const hasPlain = [...editor.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+    if (text !== 'Playwright рулит') return Lab.fail(`опубликован текст «${text}»`);
+    if (boldText !== text || hasPlain) return Lab.fail('текст жирный не целиком');
+    Lab.success('Статья опубликована');
+  });
+</script>
+{% endblock %}
