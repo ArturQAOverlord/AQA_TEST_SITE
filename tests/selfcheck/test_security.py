@@ -58,3 +58,18 @@ def test_stored_xss_payload_is_not_executed_as_markup(client):
     r = client.post("/api/todos", json={"title": "<img src=x onerror=alert(1)>"})
     assert r.status_code == 201
     assert r.get_json()["title"] == "<img src=x onerror=alert(1)>"
+
+
+def test_run_video_serves_only_recordings(client):
+    # Отдаются только .webm из папки записей миссии — ни выхода за её пределы, ни других файлов
+    assert client.get("/api/run/first-click/video/..%2F..%2Fapp.py").status_code == 404
+    assert client.get("/api/run/first-click/video/../../progress.json").status_code == 404
+    assert client.get("/api/run/first-click/video/notes.txt").status_code == 404
+    assert client.get("/api/run/no-such-mission/video/video.webm").status_code == 404
+
+
+def test_live_frames_need_run_token(client):
+    # Кадры живого показа принимаются только от pytest, запущенного кнопкой «Запустить»
+    frame = {"data": b"\xff\xd8jpeg", "content_type": "image/jpeg"}
+    assert client.post("/api/live/first-click/frame", **frame).status_code == 403
+    assert client.post("/api/live/first-click/frame", headers={"X-Live-Token": "guess"}, **frame).status_code == 403

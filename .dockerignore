@@ -10,3 +10,4 @@ allure-results
 **/__snapshots__
 progress.json
 verified.json
+runs

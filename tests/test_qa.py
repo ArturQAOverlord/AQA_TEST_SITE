@@ -6,8 +6,9 @@ import re
 
 from playwright.sync_api import Page, expect
 
-from app import create_app
+from app import QA_PASS_RATIO, create_app
 from qa_course import QUIZZES, QUIZZES_BY_SLUG, TOPICS_BY_ID, normalize
+from qa_theory import THEORY
 
 LEVELS = ("Easy", "Medium", "Hard")
 
@@ -41,6 +42,18 @@ def test_qa_bank_is_consistent():
             else:
                 assert q.kind == "text" and q.answer and not q.options, q.id
             assert len({plain(o) for o in q.options}) == len(q.options), f"{q.id}: повторяются варианты"
+
+
+def test_qa_every_quiz_has_theory():
+    assert set(THEORY) == set(QUIZZES_BY_SLUG), "у каждого теста должна быть теория, и только у них"
+    client = create_app().test_client()
+    for quiz in QUIZZES:
+        assert "<h3>" in THEORY[quiz.slug], quiz.slug
+        data = client.get(f"/api/qa/{quiz.slug}/theory").get_json()
+        assert data == {"title": quiz.title, "html": THEORY[quiz.slug]}
+        # до завершения теста теории на странице нет — она приходит запросом после финиша
+        assert THEORY[quiz.slug][:200] not in client.get(f"/qa/{quiz.slug}").get_data(as_text=True)
+    assert client.get("/api/qa/no-such-quiz/theory").status_code == 404
 
 
 def test_qa_check_grades_every_question():
@@ -113,16 +126,29 @@ def test_qa_quiz_all_correct(page: Page):
     expect(page.get_by_text("Ни одной ошибки!")).to_be_visible()
     expect(page.locator("#quiz")).not_to_contain_text("null")
 
+    # после теста сразу открывается теория; её можно закрыть и открыть снова
+    theory = page.get_by_role("dialog", name=f"📖 Теория: {quiz.title}")
+    expect(theory).to_be_visible()
+    expect(theory).to_contain_text("7 принципов тестирования")
+    theory.get_by_role("button", name="Понятно").click()
+    expect(theory).to_be_hidden()
+    page.get_by_role("button", name="📖 Теория по теме").click()
+    expect(theory).to_be_visible()
+    theory.get_by_role("button", name="Закрыть").click()
+    expect(theory).to_be_hidden()
+
 
 def test_qa_quiz_shows_mistakes(page: Page):
     quiz = QUIZZES_BY_SLUG["http"]
-    wrong = {quiz.questions[0].id, quiz.questions[2].id, quiz.questions[4].id}
+    total = len(quiz.questions)
+    # Ровно столько ошибок, чтобы не дотянуть до порога сдачи
+    misses = next(n for n in range(1, total + 1) if total - n < QA_PASS_RATIO * total)
+    wrong = {q.id for q in quiz.questions[::2][:misses]}
     page.goto("/qa/http")
     answer_quiz(page, "http", wrong)
-    total = len(quiz.questions)
-    expect(page.locator(".quiz-score")).to_have_text(f"Результат: {total - 3} из {total}")
+    expect(page.locator(".quiz-score")).to_have_text(f"Результат: {total - misses} из {total}")
     expect(page.get_by_text("Не сдан")).to_be_visible()
-    expect(page.locator(".quiz-mistakes > li")).to_have_count(3)
+    expect(page.locator(".quiz-mistakes > li")).to_have_count(misses)
 
 
 # ---------- практикумы: ответы и баги действительно есть на стендах ----------

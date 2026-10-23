@@ -1,6 +1,6 @@
 """AQA Lab — тренажёр локаторов и Playwright.
 
-Запуск: python app.py  ->  http://127.0.0.1:5000
+Запуск: python app.py  ->  
 
 Переменная окружения LAB_MUTANT="<slug>:<мутант>" включает другую версию
 одной песочницы — так verify.py проверяет тесты (см. missions.py).
@@ -14,6 +14,7 @@ import json
 import os
 import random
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -30,6 +31,7 @@ from markupsafe import Markup
 
 from missions import CATEGORIES, MISSIONS, MISSIONS_BY_SLUG, TRACKS, TRACKS_BY_ID
 from qa_course import QUIZZES, QUIZZES_BY_SLUG, TOPICS_BY_ID, answer_text, check_answer
+from qa_theory import THEORY
 
 BASE_DIR = Path(__file__).resolve().parent
 # В Docker прогресс хранится в примонтированной папке (LAB_DATA_DIR), локально — рядом с app.py
@@ -37,6 +39,8 @@ DATA_DIR = Path(os.environ.get("LAB_DATA_DIR", BASE_DIR))
 PROGRESS_FILE = DATA_DIR / "progress.json"
 VERIFIED_FILE = DATA_DIR / "verified.json"
 QA_PROGRESS_FILE = DATA_DIR / "qa_progress.json"
+# Видео последнего прогона каждой миссии: тест идёт в отдельном браузере, запись показывает, что он делал
+RUNS_DIR = DATA_DIR / "runs"
 # Тест трека Manual QA считается сданным от 80% верных ответов с первой попытки
 QA_PASS_RATIO = 0.8
 SOLUTIONS_DIR = BASE_DIR / "tests"
@@ -212,6 +216,9 @@ def create_app() -> Flask:
     todos: list[dict] = []
     parts: dict[tuple[str, bool], set[str]] = {}
     verify_jobs: dict[str, dict] = {}
+    # Живой показ прогона: браузер теста шлёт кадры экрана (conftest.py), страница миссии получает их по WebSocket
+    live_runs: dict[str, dict] = {}
+    live_changed = threading.Condition()
     run_locks: dict[str, threading.Lock] = {}
 
     chat_rooms: dict[str, list[dict]] = {}
@@ -415,6 +422,12 @@ def create_app() -> Flask:
             explanation=question.explanation,
         )
 
+    @app.get("/api/qa/<slug>/theory")
+    def qa_theory(slug):
+        # Страница запрашивает теорию только после завершения теста, чтобы она не подсказывала ответы
+        quiz = QUIZZES_BY_SLUG.get(slug) or abort(404)
+        return jsonify(title=quiz.title, html=THEORY[slug])
+
     @app.get("/api/qa/progress")
     def qa_progress_list():
         return jsonify(read_json(QA_PROGRESS_FILE))
@@ -517,9 +530,19 @@ def create_app() -> Flask:
             cmd = [sys.executable, "-m", "pytest", path.relative_to(BASE_DIR).as_posix(),
                    "-q", "--tb=short", "--color=no", "-p", "no:cacheprovider",
                    "--base-url", request.host_url.rstrip("/")]
+            if headed or data.get("slow"):
+                cmd += ["--slowmo", "300"]
             if headed:
-                cmd += ["--headed", "--slowmo", "300"]
-            env = {**os.environ, "PYTHONIOENCODING": "utf-8", "LAB_MUTANT": ""}
+                cmd += ["--headed"]
+            videos = RUNS_DIR / slug
+            shutil.rmtree(videos, ignore_errors=True)
+            cmd += ["--video", "on", "--output", str(videos)]
+            token = secrets.token_hex(16)
+            with live_changed:
+                live_runs[slug] = {"token": token, "frame": None, "seq": 0, "done": False}
+                live_changed.notify_all()
+            env = {**os.environ, "PYTHONIOENCODING": "utf-8", "LAB_MUTANT": "",
+                   "LAB_LIVE_URL": f"{request.host_url}api/live/{slug}/frame", "LAB_LIVE_TOKEN": token}
             started = time.time()
             try:
                 proc = subprocess.run(cmd, cwd=BASE_DIR, env=env, capture_output=True, text=True,
@@ -533,9 +556,68 @@ def create_app() -> Flask:
                 duration=round(time.time() - started, 1),
                 path=path.relative_to(BASE_DIR).as_posix(),
                 solved=slug in read_json(PROGRESS_FILE),
+                videos=run_videos(slug),
             )
         finally:
+            with live_changed:
+                if slug in live_runs:
+                    live_runs[slug]["done"] = True
+                live_changed.notify_all()
             lock.release()
+
+    @app.post("/api/live/<slug>/frame")
+    def live_frame(slug):
+        # Кадры шлёт только запущенный нами pytest: он знает одноразовый токен прогона
+        run = live_runs.get(slug)
+        token = request.headers.get("X-Live-Token", "")
+        if not run or run["done"] or not hmac.compare_digest(token, run["token"]):
+            return jsonify(error="no active run"), 403
+        frame = request.get_data()
+        if not frame or len(frame) > 2_000_000:
+            return jsonify(error="bad frame"), 400
+        with live_changed:
+            run["frame"], run["seq"] = frame, run["seq"] + 1
+            live_changed.notify_all()
+        return "", 204
+
+    @sock.route("/ws/live/<slug>")
+    def ws_live(ws, slug):
+        """Транслирует кадры текущего (или следующего, если ещё не начался) прогона миссии."""
+        get_mission(slug)
+        if runner_forbidden():
+            return
+        deadline = time.time() + 15
+        with live_changed:
+            # Ждём активный прогон: страница подключается чуть раньше, чем сервер его создаст
+            while not (slug in live_runs and not live_runs[slug]["done"]):
+                if not live_changed.wait(timeout=max(0.0, deadline - time.time())):
+                    return
+            run, sent = live_runs[slug], 0
+        while True:
+            with live_changed:
+                while run["seq"] == sent and not run["done"]:
+                    live_changed.wait(timeout=1)
+                frame, sent, done = run["frame"], run["seq"], run["done"]
+            if frame is not None and sent:
+                ws.send(frame)
+            if done:
+                return
+
+    def run_videos(slug: str) -> list[str]:
+        """Адреса видео последнего прогона: по одному на каждую страницу, которую открыл тест."""
+        folder = RUNS_DIR / slug
+        files = sorted(folder.rglob("*.webm"), key=lambda f: f.stat().st_mtime) if folder.is_dir() else []
+        stamp = int(time.time())
+        return [f"/api/run/{slug}/video/{f.relative_to(folder).as_posix()}?t={stamp}" for f in files]
+
+    @app.get("/api/run/<slug>/video/<path:name>")
+    def solution_video(slug, name):
+        get_mission(slug)
+        if not name.endswith(".webm"):
+            abort(404)
+        response = send_from_directory(RUNS_DIR / slug, name, mimetype="video/webm")
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.post("/api/verify/<slug>")
     def verify_start(slug):

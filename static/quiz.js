@@ -1,5 +1,5 @@
 // Прохождение теста трека Manual QA: один вопрос на экране, проверка ответа на сервере,
-// разбор после каждого ответа и итог со списком ошибок.
+// разбор после каждого ответа, итог со списком ошибок и окно с теорией по теме теста.
 // Тексты вопросов, вариантов и объяснений — наш контент, поэтому выводятся как HTML;
 // всё, что вводит пользователь, — только через textContent.
 (function () {
@@ -9,6 +9,7 @@
   const data = JSON.parse(document.getElementById('quiz-data').textContent);
   const questions = data.questions;
   let idx = 0, score = 0, mistakes = [];
+  let theory = null;
 
   function h(tag, props = {}, ...children) {
     const node = document.createElement(tag);
@@ -119,6 +120,40 @@
     next.focus();
   }
 
+  // Теория приходит с сервера только после завершения теста, чтобы не подсказывать ответы
+  async function loadTheory() {
+    if (theory) return theory;
+    try {
+      const r = await fetch(`/api/qa/${slug}/theory`);
+      if (r.ok) theory = await r.json();
+    } catch (e) { /* без теории итог всё равно показывается */ }
+    return theory;
+  }
+
+  function theoryDialog() {
+    let dialog = document.getElementById('theory-dialog');
+    if (dialog) return dialog;
+    const close = () => dialog.close();
+    dialog = h('dialog', { id: 'theory-dialog', class: 'theory-dialog', 'aria-labelledby': 'theory-title' },
+      h('header', { class: 'theory-head' },
+        h('h2', { id: 'theory-title', text: `📖 Теория: ${theory.title}` }),
+        h('button', { type: 'button', class: 'theory-x', 'aria-label': 'Закрыть', text: '✕', onclick: close })),
+      h('div', { class: 'theory-body prose', html: theory.html }),
+      h('footer', { class: 'theory-foot' },
+        h('button', { type: 'button', class: 'btn-primary', text: 'Понятно', onclick: close })));
+    // Клик по затемнению вокруг окна тоже закрывает его
+    dialog.addEventListener('click', e => { if (e.target === dialog) close(); });
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  function openTheory() {
+    if (!theory) return;
+    const dialog = theoryDialog();
+    dialog.querySelector('.theory-body').scrollTop = 0;
+    dialog.showModal();
+  }
+
   async function finish() {
     const total = questions.length;
     const passed = score >= data.pass_ratio * total;
@@ -129,6 +164,7 @@
       });
       if (r.ok) saved = await r.json();
     } catch (e) { /* результат просто не сохранится */ }
+    await loadTheory();
 
     const list = h('ol', { class: 'quiz-mistakes' }, mistakes.map(m => h('li', {},
       h('div', { class: 'quiz-text', html: m.q.text }),
@@ -145,11 +181,13 @@
       mistakes.length ? h('h3', { text: 'Разбор ошибок' }) : h('p', { text: 'Ни одной ошибки!' }),
       mistakes.length ? list : null,
       h('div', { class: 'row-gap' },
+        theory ? h('button', { type: 'button', class: 'btn-ghost', text: '📖 Теория по теме', onclick: openTheory }) : null,
         h('button', { type: 'button', class: 'btn-ghost', text: 'Пройти заново',
           onclick: () => { idx = 0; score = 0; mistakes = []; renderQuestion(); } }),
         data.next ? h('a', { class: 'btn-primary', href: data.next, text: 'Следующий тест →' }) : null,
         h('a', { class: 'btn-ghost', href: '/qa', text: 'К списку тестов' })),
     ].filter(Boolean));
+    openTheory();
   }
 
   renderQuestion();

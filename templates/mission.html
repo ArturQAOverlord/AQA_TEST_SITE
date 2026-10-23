@@ -49,8 +49,9 @@
       <textarea id="code" spellcheck="false" aria-label="Код теста">{{ editor_code }}</textarea>
       <div class="editor-toolbar">
         <button class="btn-primary" type="button" id="run">▶ Запустить</button>
+        <label class="inline muted" title="Пауза 0,3 с перед каждым действием, чтобы было видно клики и ввод"><input type="checkbox" id="slow" checked> замедлить</label>
         {% if not headless_only %}
-        <label class="inline muted"><input type="checkbox" id="headed"> показывать браузер</label>
+        <label class="inline muted"><input type="checkbox" id="headed"> отдельным окном</label>
         {% endif %}
         <span class="spacer"></span>
         <button class="btn-ghost" type="button" id="save">Сохранить</button>
@@ -156,6 +157,11 @@
   </section>
 
   <section class="mission-preview">
+    <div class="preview-tabs" role="tablist" aria-label="Правая панель">
+      <button type="button" role="tab" id="tab-sandbox" aria-selected="true" aria-controls="sandbox-pane">Песочница</button>
+      <button type="button" role="tab" id="tab-video" aria-selected="false" aria-controls="video-pane" disabled>▶ Прогон теста</button>
+    </div>
+    <div id="sandbox-pane" role="tabpanel" aria-labelledby="tab-sandbox">
     <div class="preview-bar">
       <span class="url">/play/{{ mission.slug }}</span>
       <span>
@@ -163,7 +169,11 @@
         <a class="btn-ghost" href="{{ url_for('playground', slug=mission.slug) }}" target="_blank">Открыть отдельно ↗</a>
       </span>
     </div>
+    <p class="preview-hint">Это твоя копия страницы — изучай её и ищи локаторы. Тест работает в своём браузере:
+      после «▶ Запустить» здесь откроется вкладка «Прогон теста» с его экраном в реальном времени.</p>
     <iframe id="preview" src="{{ url_for('playground', slug=mission.slug) }}" title="Песочница"></iframe>
+    </div>
+    <div id="video-pane" class="video-pane" role="tabpanel" aria-labelledby="tab-video" hidden></div>
   </section>
 </div>
 {% endblock %}

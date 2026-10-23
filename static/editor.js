@@ -120,12 +120,14 @@
     summary.className = 'run-summary';
     summary.textContent = 'Запускаю pytest…';
     output.textContent = '';
+    startLive();
     try {
       const headed = document.getElementById('headed');
       const r = await fetch(`/api/run/${slug}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: getCode(), headed: headed ? headed.checked : false }),
+        body: JSON.stringify({ code: getCode(), headed: headed ? headed.checked : false,
+          slow: document.getElementById('slow').checked }),
       });
       if (!r.ok) {
         summary.className = 'run-summary fail';
@@ -139,15 +141,106 @@
       output.textContent = data.output;
       saveState.textContent = 'сохранён';
       if (data.solved) document.getElementById('solved-badge').classList.remove('hidden');
+      showVideos(data.videos || [], document.getElementById('slow').checked);
     } catch (e) {
       summary.className = 'run-summary fail';
       summary.textContent = 'Не удалось связаться с сервером: ' + e;
     } finally {
+      stopLive();
       clearInterval(timer);
       runBtn.disabled = false;
       runBtn.textContent = '▶ Запустить';
     }
   }
+
+  // Правая панель: песочница (своя копия страницы) и запись того, что делал тест в своём браузере
+  const tabSandbox = document.getElementById('tab-sandbox');
+  const tabVideo = document.getElementById('tab-video');
+  const sandboxPane = document.getElementById('sandbox-pane');
+  const videoPane = document.getElementById('video-pane');
+
+  function selectTab(video) {
+    tabSandbox.setAttribute('aria-selected', String(!video));
+    tabVideo.setAttribute('aria-selected', String(video));
+    sandboxPane.hidden = video;
+    videoPane.hidden = !video;
+    if (!video) videoPane.querySelectorAll('video').forEach(v => v.pause());
+  }
+
+  // Пока тест идёт, справа — живой экран его браузера: кадры приходят с сервера по WebSocket
+  let liveSocket = null;
+
+  function startLive() {
+    stopLive();
+    const status = document.createElement('p');
+    status.className = 'preview-hint';
+    status.textContent = 'Запускаю браузер теста…';
+    const img = document.createElement('img');
+    img.className = 'live-frame';
+    img.alt = 'Экран браузера, в котором выполняется тест';
+    img.hidden = true;
+    videoPane.replaceChildren(status, img);
+    tabVideo.disabled = false;
+    selectTab(true);
+
+    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/live/${slug}`);
+    ws.binaryType = 'blob';
+    let shown = null;
+    ws.addEventListener('message', e => {
+      if (typeof e.data === 'string') return;
+      const next = URL.createObjectURL(e.data);
+      img.onload = () => { if (shown) URL.revokeObjectURL(shown); shown = next; };
+      img.src = next;
+      img.hidden = false;
+      status.className = 'preview-hint live-status';
+      status.textContent = '● Идёт прогон — это экран браузера, в котором работает твой тест';
+    });
+    liveSocket = ws;
+  }
+
+  function stopLive() {
+    if (liveSocket) liveSocket.close();
+    liveSocket = null;
+  }
+
+  function showVideos(urls, slow) {
+    videoPane.replaceChildren();
+    tabVideo.disabled = false;
+    if (!urls.length) {
+      const note = document.createElement('p');
+      note.className = 'preview-hint';
+      note.textContent = 'Записи нет: тест не открыл страницу через фикстуру page (или упал раньше).';
+      videoPane.appendChild(note);
+      selectTab(true);
+      return;
+    }
+    const hint = document.createElement('p');
+    hint.className = 'preview-hint';
+    hint.textContent = 'Прогон завершён. Это запись того, что делал тест, — её можно пересмотреть, ' +
+      'перемотать и замедлить в меню плеера.';
+    videoPane.appendChild(hint);
+    urls.forEach((url, i) => {
+      if (urls.length > 1) {
+        const label = document.createElement('p');
+        label.className = 'video-label';
+        label.textContent = `Страница ${i + 1} из ${urls.length}`;
+        videoPane.appendChild(label);
+      }
+      const video = document.createElement('video');
+      // Без замедления тест кликает быстрее, чем успеваешь заметить, — замедляем просмотр
+      video.defaultPlaybackRate = slow ? 1 : 0.5;
+      video.controls = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = i === 0;
+      video.src = url;
+      videoPane.appendChild(video);
+    });
+    selectTab(true);
+  }
+
+  tabSandbox.addEventListener('click', () => selectTab(false));
+  tabVideo.addEventListener('click', () => selectTab(true));
 
   runBtn.addEventListener('click', run);
   document.getElementById('save').addEventListener('click', save);
