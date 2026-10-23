@@ -136,7 +136,8 @@
       h('p', {}, h('b', { text: 'Правильный: ' }), h('span', { html: m.res.answer })),
       h('div', { class: 'prose muted', html: m.res.explanation }))));
 
-    root.replaceChildren(
+    // replaceChildren превращает null в текст «null», поэтому пустые части отфильтровываем
+    root.replaceChildren(...[
       h('h2', { class: 'quiz-score', text: `Результат: ${score} из ${total}` }),
       h('p', { class: passed ? 'done-mark' : 'warn-mark',
         text: passed ? 'Тест сдан 🎉' : `Не сдан: нужно от ${Math.ceil(data.pass_ratio * total)} верных ответов` }),
@@ -147,7 +148,8 @@
         h('button', { type: 'button', class: 'btn-ghost', text: 'Пройти заново',
           onclick: () => { idx = 0; score = 0; mistakes = []; renderQuestion(); } }),
         data.next ? h('a', { class: 'btn-primary', href: data.next, text: 'Следующий тест →' }) : null,
-        h('a', { class: 'btn-ghost', href: '/qa', text: 'К списку тестов' })));
+        h('a', { class: 'btn-ghost', href: '/qa', text: 'К списку тестов' })),
+    ].filter(Boolean));
   }
 
   renderQuestion();

@@ -111,6 +111,7 @@ def test_qa_quiz_all_correct(page: Page):
     expect(page.locator(".quiz-score")).to_have_text(f"Результат: {len(quiz.questions)} из {len(quiz.questions)}")
     expect(page.get_by_text("Тест сдан")).to_be_visible()
     expect(page.get_by_text("Ни одной ошибки!")).to_be_visible()
+    expect(page.locator("#quiz")).not_to_contain_text("null")
 
 
 def test_qa_quiz_shows_mistakes(page: Page):
